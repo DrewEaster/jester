@@ -27,10 +27,6 @@ public class ExampleService {
     }
 
     public Example getExample(CommandEnvelope<GetExample> commandEnvelope) {
-
-        ReadOnlyCommandHandler<ExampleAggregate> readOnlyCommandHandler = commandHandlerFactory.readOnlyHandlerFor(
-                ExampleAggregate.class);
-
-        return readOnlyCommandHandler.handle(commandEnvelope);
+        return commandHandlerFactory.readOnlyHandlerFor(ExampleAggregate.class).handle(commandEnvelope);
     }
 }
