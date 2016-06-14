@@ -1,7 +1,8 @@
 package com.dreweaster.ddd.example.domain;
 
+import com.dreweaster.ddd.framework.DomainEvent;
+
 /**
- * Created by andrew on 07/06/2016.
  */
-public class ExampleEvent {
+public class ExampleEvent implements DomainEvent {
 }

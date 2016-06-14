@@ -1,6 +1,8 @@
 package com.dreweaster.ddd.example.domain;
 
-public class GetExample extends ExampleCommand {
+import com.dreweaster.ddd.framework.ReadOnlyDomainCommand;
+
+public class GetExample implements ReadOnlyDomainCommand<Example> {
 
     private static final GetExample SINGLETON = new GetExample();
 

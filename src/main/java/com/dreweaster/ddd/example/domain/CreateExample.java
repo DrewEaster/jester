@@ -1,8 +1,10 @@
 package com.dreweaster.ddd.example.domain;
 
+import com.dreweaster.ddd.framework.DomainCommand;
+
 /**
  */
-public class CreateExample extends ExampleCommand {
+public class CreateExample implements DomainCommand {
 
     public static CreateExample of(String exampleString) {
         return new CreateExample(exampleString);

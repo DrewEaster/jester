@@ -1,6 +1,6 @@
 package com.dreweaster.ddd.framework;
 
-public interface ReadOnlyCommandHandler<C, R> {
+public interface ReadOnlyCommandHandler<A extends Aggregate<E, ?>, E extends DomainEvent> {
 
-    R handle(Command<C> command);
+    <R, C extends ReadOnlyDomainCommand<R>> R handle(CommandEnvelope<C> command);
 }

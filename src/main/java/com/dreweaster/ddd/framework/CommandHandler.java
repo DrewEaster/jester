@@ -2,7 +2,7 @@ package com.dreweaster.ddd.framework;
 
 import java.util.List;
 
-public interface CommandHandler<A, C, E> {
+public interface CommandHandler<A extends Aggregate<E, ?>, E extends DomainEvent> {
 
-    List<DomainEvent<A, E>> handle(Command<C> command);
+    <C extends DomainCommand> List<PersistedEvent<A, E>> handle(CommandEnvelope<C> command);
 }

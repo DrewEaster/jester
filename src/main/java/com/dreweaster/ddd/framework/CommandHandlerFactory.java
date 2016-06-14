@@ -4,7 +4,7 @@ package com.dreweaster.ddd.framework;
  */
 public interface CommandHandlerFactory {
 
-    <A, C, E> CommandHandler<A, C, E> handlerFor(Class<A> aggregateType, AggregateId aggregateId);
+    <A extends Aggregate<E, ?>, E extends DomainEvent> CommandHandler<A, E> handlerFor(Class<A> aggregateType);
 
     /**
      * A read-only command handler allows read only commands to be sent to a specific aggregate instance. This allows
@@ -15,5 +15,5 @@ public interface CommandHandlerFactory {
      * aggregate instance. Read models are tuned for more powerful queries across the state of multiple aggregates,
      * but you are trading consistency for that power in those cases.
      */
-    <A, C, R> ReadOnlyCommandHandler<C, R> readOnlyHandlerFor(Class<A> aggregateType, AggregateId aggregateId);
+    <A extends Aggregate<E, ?>, E extends DomainEvent> ReadOnlyCommandHandler<A, E> readOnlyHandlerFor(Class<A> aggregateType);
 }

@@ -28,7 +28,7 @@ public class TimeRestrictedCommandDeduplicationStrategy implements CommandDedupl
         }
 
         @Override
-        public CommandDeduplicationStrategyBuilder addDomainEvent(DomainEvent<?, ?> domainEvent) {
+        public CommandDeduplicationStrategyBuilder addEvent(PersistedEvent<?, ?> domainEvent) {
             if (domainEvent.timestamp().isAfter(barrierDate)) {
                 commandIds.add(domainEvent.commandId());
             }

@@ -2,10 +2,10 @@ package com.dreweaster.ddd.framework;
 
 import java.util.UUID;
 
-public class Command<T> {
+public class CommandEnvelope<T> {
 
-    public static <T> Command<T> of(AggregateId aggregateId, CommandId id, T payload) {
-        return new Command<T>(aggregateId, id, payload) {
+    public static <T> CommandEnvelope<T> of(AggregateId aggregateId, CommandId id, T payload) {
+        return new CommandEnvelope<T>(aggregateId, id, payload) {
             @Override
             public AggregateId aggregateId() {
                 return super.aggregateId();
@@ -18,8 +18,8 @@ public class Command<T> {
         };
     }
 
-    public static <T> Command<T> of(AggregateId aggregateId, T payload) {
-        return new Command<T>(aggregateId, CommandId.of(UUID.randomUUID().toString()), payload) {
+    public static <T> CommandEnvelope<T> of(AggregateId aggregateId, T payload) {
+        return new CommandEnvelope<T>(aggregateId, CommandId.of(UUID.randomUUID().toString()), payload) {
             @Override
             public AggregateId aggregateId() {
                 return super.aggregateId();
@@ -38,7 +38,7 @@ public class Command<T> {
 
     private T payload;
 
-    public Command(AggregateId aggregateId, CommandId id, T payload) {
+    public CommandEnvelope(AggregateId aggregateId, CommandId id, T payload) {
         this.id = id;
         this.aggregateId = aggregateId;
         this.payload = payload;

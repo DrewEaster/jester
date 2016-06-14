@@ -1,4 +1,5 @@
 package com.dreweaster.ddd.framework;
 
-public interface DomainEvent {
+public interface DomainCommand {
+
 }

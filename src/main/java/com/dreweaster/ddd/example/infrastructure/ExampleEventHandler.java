@@ -3,7 +3,7 @@ package com.dreweaster.ddd.example.infrastructure;
 import com.dreweaster.ddd.example.application.ExampleService;
 import com.dreweaster.ddd.example.domain.CreateExample;
 import com.dreweaster.ddd.framework.AggregateId;
-import com.dreweaster.ddd.framework.Command;
+import com.dreweaster.ddd.framework.CommandEnvelope;
 import com.dreweaster.ddd.framework.CommandId;
 
 /**
@@ -37,7 +37,7 @@ public class ExampleEventHandler {
         // always create the same command id here. In such a case, the command handler can recognise that the
         // command has already been handled, and ignore it without forwarding it to the aggregate.
 
-        Command<CreateExample> cmd = Command.of(
+        CommandEnvelope<CreateExample> cmd = CommandEnvelope.of(
                 AggregateId.of("deterministic-aggregate-id"),
                 CommandId.of("deterministic-command-id"),
                 CreateExample.of("Hello, World!"));
