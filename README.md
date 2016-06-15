@@ -1,2 +1,2 @@
 # jester
-Simple DDD/CQRS/Eventsourcing library for Java
+Reactive DDD/CQRS/Eventsourcing library for Java
