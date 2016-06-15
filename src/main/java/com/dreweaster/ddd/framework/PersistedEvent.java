@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 /**
  */
-public interface PersistedEvent<A extends Aggregate<E, ?>, E extends DomainEvent> {
+public interface PersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> {
 
     Class<A> aggregateType();
 

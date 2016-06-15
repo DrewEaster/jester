@@ -6,14 +6,14 @@ import com.dreweaster.ddd.framework.BehaviourBuilder;
 
 import java.util.Optional;
 
-public class ExampleAggregate extends Aggregate<ExampleEvent, Example> {
+public class ExampleAggregate extends Aggregate<ExampleCommand, ExampleEvent, Example> {
 
     @Override
     protected Behaviour initialBehaviour(Optional<Example> snapshotState) {
 
-        BehaviourBuilder<ExampleEvent, Example> behaviourBuilder = newBehaviourBuilder();
+        BehaviourBuilder<ExampleCommand, ExampleEvent, Example> behaviourBuilder = newBehaviourBuilder();
 
-        behaviourBuilder.setReadOnlyCommandHandler(GetExample.class, (cmd, ctx) -> ctx.success(new Example()));
+        behaviourBuilder.setCommandHandler(CreateExample.class, (cmd, ctx) -> ctx.success(new ExampleCreated()));
 
         return behaviourBuilder.build();
     }

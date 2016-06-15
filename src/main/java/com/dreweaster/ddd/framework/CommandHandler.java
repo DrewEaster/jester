@@ -1,8 +1,10 @@
 package com.dreweaster.ddd.framework;
 
+import rx.Single;
+
 import java.util.List;
 
-public interface CommandHandler<A extends Aggregate<E, ?>, E extends DomainEvent> {
+public interface CommandHandler<A extends Aggregate<C, E, ?>, C extends DomainCommand, E extends DomainEvent> {
 
-    <C extends DomainCommand> List<PersistedEvent<A, E>> handle(CommandEnvelope<C> command);
+    Single<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command);
 }
