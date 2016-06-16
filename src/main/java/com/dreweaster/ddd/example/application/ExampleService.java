@@ -6,9 +6,9 @@ import com.dreweaster.ddd.example.domain.ExampleEvent;
 import com.dreweaster.ddd.framework.CommandEnvelope;
 import com.dreweaster.ddd.framework.CommandHandlerFactory;
 import com.dreweaster.ddd.framework.PersistedEvent;
-import rx.Single;
 
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 
 public class ExampleService {
 
@@ -20,7 +20,15 @@ public class ExampleService {
 
     public void createExample(CommandEnvelope<CreateExample> commandEnvelope) {
 
-        Single<List<PersistedEvent<ExampleAggregate, ExampleEvent>>> events =
+        CompletionStage<List<PersistedEvent<ExampleAggregate, ExampleEvent>>> eventsFuture =
                 commandHandlerFactory.handlerFor(ExampleAggregate.class).handle(commandEnvelope);
+
+        eventsFuture.whenComplete((events, error) -> {
+            if (events != null) {
+                events.forEach(System.out::println);
+            } else {
+                error.printStackTrace();
+            }
+        });
     }
 }

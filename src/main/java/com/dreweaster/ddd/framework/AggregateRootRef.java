@@ -1,10 +1,9 @@
 package com.dreweaster.ddd.framework;
 
-import rx.Single;
-
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 
-public interface AggregateRootRef<E> {
+public interface AggregateRootRef<C, E> {
 
-    <C extends DomainCommand> Single<List<E>> handle(C command);
+    CompletionStage<List<E>> handle(C command);
 }

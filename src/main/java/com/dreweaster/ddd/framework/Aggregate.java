@@ -11,9 +11,9 @@ public abstract class Aggregate<C extends DomainCommand, E extends DomainEvent, 
         }
     }
 
-    protected abstract Behaviour initialBehaviour(Optional<State> snapshotState);
+    protected abstract Behaviour<C, E, State> initialBehaviour(Optional<State> snapshotState);
 
-    protected final BehaviourBuilder<C, E, State> newBehaviourBuilder() {
-        return new BehaviourBuilder<>();
+    protected final BehaviourBuilder<C, E, State> newBehaviourBuilder(State state) {
+        return new BehaviourBuilder<>(state);
     }
 }

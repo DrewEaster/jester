@@ -3,17 +3,24 @@ package com.dreweaster.ddd.example.infrastructure;
 import com.dreweaster.ddd.example.application.ExampleService;
 import com.dreweaster.ddd.example.domain.CreateExample;
 import com.dreweaster.ddd.framework.AggregateId;
+import com.dreweaster.ddd.framework.AggregateRootFactory;
+import com.dreweaster.ddd.framework.AggregateRootFactoryImpl;
+import com.dreweaster.ddd.framework.CommandDeduplicationStrategyFactory;
+import com.dreweaster.ddd.framework.CommandDeduplicationStrategyFactoryImpl;
 import com.dreweaster.ddd.framework.CommandEnvelope;
+import com.dreweaster.ddd.framework.CommandHandlerFactory;
 import com.dreweaster.ddd.framework.CommandId;
+import com.dreweaster.ddd.framework.DeduplicatingCommandHandlerFactory;
+import com.dreweaster.ddd.framework.DummyEventStore;
+import com.dreweaster.ddd.framework.EventStore;
 
 /**
  */
 public class ExampleEventHandler {
 
-    private ExampleService exampleService;
-
-    public ExampleEventHandler(ExampleService exampleService) {
-        this.exampleService = exampleService;
+    public static void main(String[] args) {
+        ExampleEventHandler handler = new ExampleEventHandler();
+        handler.handleEvent();
     }
 
     public void handleEvent() {
@@ -37,10 +44,22 @@ public class ExampleEventHandler {
         // always create the same command id here. In such a case, the command handler can recognise that the
         // command has already been handled, and ignore it without forwarding it to the aggregate.
 
+        EventStore eventStore = new DummyEventStore();
+        AggregateRootFactory aggregateRootFactory = new AggregateRootFactoryImpl();
+        CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory = new CommandDeduplicationStrategyFactoryImpl();
+        CommandHandlerFactory commandHandlerFactory = new DeduplicatingCommandHandlerFactory(
+                aggregateRootFactory,
+                eventStore,
+                commandDeduplicationStrategyFactory);
+
+        ExampleService exampleService = new ExampleService(commandHandlerFactory);
+
         CommandEnvelope<CreateExample> cmd = CommandEnvelope.of(
                 AggregateId.of("deterministic-aggregate-id"),
                 CommandId.of("deterministic-command-id"),
                 CreateExample.of("Hello, World!"));
+
+        exampleService.createExample(cmd);
 
         exampleService.createExample(cmd);
     }

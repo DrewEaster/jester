@@ -4,6 +4,6 @@ package com.dreweaster.ddd.framework;
  */
 public interface CommandHandlerFactory {
 
-    <A extends Aggregate<C, E, ?>, C extends DomainCommand, E extends DomainEvent> CommandHandler<A, C, E> handlerFor(Class<A> aggregateType);
+    <A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> CommandHandler<A, C, E, State> handlerFor(Class<A> aggregateType);
 
 }

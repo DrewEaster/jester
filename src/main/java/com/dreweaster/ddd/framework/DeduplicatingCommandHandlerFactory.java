@@ -1,10 +1,10 @@
 package com.dreweaster.ddd.framework;
 
-import rx.Single;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  */
@@ -26,12 +26,12 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
     }
 
     @Override
-    public <A extends Aggregate<C, E, ?>, C extends DomainCommand, E extends DomainEvent> CommandHandler<A, C, E> handlerFor(Class<A> aggregateType) {
+    public <A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> CommandHandler<A, C, E, State> handlerFor(Class<A> aggregateType) {
         return new DeduplicatingCommandHandler<>(aggregateType);
     }
 
     // TODO: Snapshots will have to store last n minutes/hours/days of command ids within their payload.
-    private class DeduplicatingCommandHandler<A extends Aggregate<C, E, ?>, C extends DomainCommand, E extends DomainEvent> implements CommandHandler<A, C, E> {
+    private class DeduplicatingCommandHandler<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements CommandHandler<A, C, E, State> {
 
         private Class<A> aggregateType;
 
@@ -40,8 +40,8 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
         }
 
         @Override
-        public Single<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
-            return eventStore.loadEvents(aggregateType, command.aggregateId()).flatMap(previousEvents -> {
+        public CompletionStage<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
+            return eventStore.loadEvents(aggregateType, command.aggregateId()).thenCompose(previousEvents -> {
                 Long expectedSequenceNumber = -1L;
 
                 CommandDeduplicationStrategyBuilder commandDeduplicationStrategyBuilder =
@@ -67,7 +67,7 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
 
                 CommandDeduplicationStrategy deduplicationStrategy = commandDeduplicationStrategyBuilder.build();
 
-                AggregateRootRef<E> aggregateRootRef = aggregateRootFactory.aggregateOf(
+                AggregateRootRef<C, E> aggregateRootRef = aggregateRootFactory.aggregateOf(
                         aggregateType,
                         command.aggregateId(),
                         rawPreviousEvents);
@@ -79,7 +79,8 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
                 // we've seen that is not filtered out by the deduplication strategy.
                 if (!deduplicationStrategy.isDuplicate(command.id())) {
                     final Long finalExpectedSequenceNumber = expectedSequenceNumber;
-                    return aggregateRootRef.handle(command.payload()).flatMap(generatedEvents -> eventStore.saveEvents(
+
+                    return aggregateRootRef.handle(command.payload()).thenCompose(generatedEvents -> eventStore.saveEvents(
                             aggregateType,
                             command.aggregateId(),
                             command.id(),
@@ -88,7 +89,7 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
                 } else {
                     // TODO: We should capture metrics about duplicated commands
                     // TODO: Capture/log/report on age of duplicate commands
-                    return Single.just(Collections.emptyList());
+                    return CompletableFuture.completedFuture(Collections.emptyList());
                 }
             });
         }

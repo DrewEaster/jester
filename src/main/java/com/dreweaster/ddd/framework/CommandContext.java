@@ -4,6 +4,8 @@ import java.util.List;
 
 public interface CommandContext<E extends DomainEvent> {
 
+    AggregateId aggregateId();
+
     void success(List<E> events);
 
     void success(E event);
