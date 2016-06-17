@@ -80,8 +80,6 @@ public class ExampleEventHandler {
         exampleService.createExample(cmd2).whenComplete(new ResponseHandler());
         exampleService.createExample(cmd1).whenComplete(new ResponseHandler());
 
-        Thread.sleep(2000);
-
         Publisher<StreamEvent<ExampleAggregate, ExampleEvent>> stream =
                 eventStore.stream(ExampleAggregate.class, Optional.<Long>empty());
 
@@ -108,8 +106,6 @@ public class ExampleEventHandler {
                 LOGGER.info("Stream complete!");
             }
         });
-
-        Thread.sleep(2000);
     }
 
     private class ResponseHandler implements BiConsumer<AggregateId, Throwable> {
