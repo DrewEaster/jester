@@ -5,6 +5,10 @@ import java.util.concurrent.CompletionStage;
 
 public interface EventStore {
 
+    class OptimisticConcurrencyException extends RuntimeException {
+
+    }
+
     <A extends Aggregate<?, E, ?>, E extends DomainEvent> CompletionStage<List<PersistedEvent<A, E>>> loadEvents(
             Class<A> aggregateType,
             AggregateId aggregateId);

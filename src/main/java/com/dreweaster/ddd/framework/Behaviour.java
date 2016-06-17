@@ -9,7 +9,7 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
 
     private State state;
 
-    private Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E>>> commandHandlers = new HashMap<>();
+    private Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E, State>>> commandHandlers = new HashMap<>();
 
     private Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = new HashMap<>();
 
@@ -19,7 +19,7 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
 
     public Behaviour(
             State state,
-            Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E>>> commandHandlers,
+            Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E, State>>> commandHandlers,
             Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
         this.state = state;
         this.commandHandlers = commandHandlers;
@@ -33,8 +33,14 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
     }
 
     @SuppressWarnings("unchecked")
-    public final void handleCommand(C command, CommandContext<E> commandContext) {
-        untypedCommandHandlers.get(command.getClass()).accept(command, commandContext);
+    public final boolean handleCommand(C command, CommandContext<E, State> commandContext) {
+        BiConsumer handler = untypedCommandHandlers.get(command.getClass());
+        if (handler != null) {
+            handler.accept(command, commandContext);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -43,7 +49,7 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
     }
 
     /**
-     * @return new instance with the given state
+     * @return new instance with the given currentState
      */
     public Behaviour withState(State newState) {
         return new Behaviour<>(newState, commandHandlers, eventHandlers);

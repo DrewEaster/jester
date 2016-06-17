@@ -7,7 +7,7 @@ import java.util.function.BiFunction;
 
 public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, State> {
 
-    private Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E>>> commandHandlers = new HashMap<>();
+    private Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E, State>>> commandHandlers = new HashMap<>();
 
     private Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = new HashMap<>();
 
@@ -19,7 +19,7 @@ public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, St
 
     public BehaviourBuilder(
             State state,
-            Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E>>> commandHandlers,
+            Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E, State>>> commandHandlers,
             Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
         this.state = state;
         this.commandHandlers = commandHandlers;
@@ -28,7 +28,7 @@ public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, St
 
     public <Cmd extends C> void setCommandHandler(
             Class<Cmd> commandClass, BiConsumer<Cmd,
-            CommandContext<E>> handler) {
+            CommandContext<E, State>> handler) {
 
         commandHandlers.put(commandClass, handler);
     }

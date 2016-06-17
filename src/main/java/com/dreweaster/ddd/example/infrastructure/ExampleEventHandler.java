@@ -3,8 +3,6 @@ package com.dreweaster.ddd.example.infrastructure;
 import com.dreweaster.ddd.example.application.ExampleService;
 import com.dreweaster.ddd.example.domain.CreateExample;
 import com.dreweaster.ddd.framework.AggregateId;
-import com.dreweaster.ddd.framework.AggregateRootFactory;
-import com.dreweaster.ddd.framework.AggregateRootFactoryImpl;
 import com.dreweaster.ddd.framework.CommandDeduplicationStrategyFactory;
 import com.dreweaster.ddd.framework.CommandDeduplicationStrategyFactoryImpl;
 import com.dreweaster.ddd.framework.CommandEnvelope;
@@ -13,10 +11,16 @@ import com.dreweaster.ddd.framework.CommandId;
 import com.dreweaster.ddd.framework.DeduplicatingCommandHandlerFactory;
 import com.dreweaster.ddd.framework.DummyEventStore;
 import com.dreweaster.ddd.framework.EventStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.function.BiConsumer;
 
 /**
  */
 public class ExampleEventHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ExampleEventHandler.class);
 
     public static void main(String[] args) {
         ExampleEventHandler handler = new ExampleEventHandler();
@@ -45,22 +49,35 @@ public class ExampleEventHandler {
         // command has already been handled, and ignore it without forwarding it to the aggregate.
 
         EventStore eventStore = new DummyEventStore();
-        AggregateRootFactory aggregateRootFactory = new AggregateRootFactoryImpl();
         CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory = new CommandDeduplicationStrategyFactoryImpl();
         CommandHandlerFactory commandHandlerFactory = new DeduplicatingCommandHandlerFactory(
-                aggregateRootFactory,
                 eventStore,
                 commandDeduplicationStrategyFactory);
 
         ExampleService exampleService = new ExampleService(commandHandlerFactory);
 
-        CommandEnvelope<CreateExample> cmd = CommandEnvelope.of(
-                AggregateId.of("deterministic-aggregate-id"),
-                CommandId.of("deterministic-command-id"),
+        CommandEnvelope<CreateExample> cmd1 = CommandEnvelope.of(
+                AggregateId.of("deterministic-aggregate-id-1"),
+                CommandId.of("deterministic-command-id-1"),
                 CreateExample.of("Hello, World!"));
 
-        exampleService.createExample(cmd);
+        CommandEnvelope<CreateExample> cmd2 = CommandEnvelope.of(
+                AggregateId.of("deterministic-aggregate-id-1"),
+                CommandId.of("deterministic-command-id-2"),
+                CreateExample.of("Another hello, World!"));
 
-        exampleService.createExample(cmd);
+        exampleService.createExample(cmd1).whenComplete(new ResponseHandler());
+        exampleService.createExample(cmd2).whenComplete(new ResponseHandler());
+        exampleService.createExample(cmd1).whenComplete(new ResponseHandler());
+    }
+
+    private class ResponseHandler implements BiConsumer<Void, Throwable> {
+
+        @Override
+        public void accept(Void aVoid, Throwable throwable) {
+            if (throwable != null) {
+                LOGGER.error("Error creating example!", throwable);
+            }
+        }
     }
 }

@@ -2,7 +2,9 @@ package com.dreweaster.ddd.framework;
 
 import java.util.List;
 
-public interface CommandContext<E extends DomainEvent> {
+public interface CommandContext<E extends DomainEvent, State> {
+
+    State currentState();
 
     AggregateId aggregateId();
 

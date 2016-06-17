@@ -55,4 +55,13 @@ public class CommandEnvelope<T> {
     public T payload() {
         return payload;
     }
+
+    @Override
+    public String toString() {
+        return "CommandEnvelope{" +
+                "aggregateId=" + aggregateId +
+                ", id=" + id +
+                ", payload=" + payload +
+                '}';
+    }
 }

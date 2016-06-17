@@ -1,7 +1,5 @@
 package com.dreweaster.ddd.framework;
 
-import rx.Single;
-
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 

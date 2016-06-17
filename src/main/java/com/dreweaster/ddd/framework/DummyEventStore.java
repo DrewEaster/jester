@@ -12,10 +12,6 @@ import java.util.concurrent.CompletionStage;
 
 public class DummyEventStore implements EventStore {
 
-    public static class OptimisticConcurrencyException extends RuntimeException {
-
-    }
-
     private Map<Class, Map<AggregateId, List>> eventStorage = new HashMap<>();
 
     @SuppressWarnings("unchecked")
@@ -49,7 +45,7 @@ public class DummyEventStore implements EventStore {
             Map<AggregateId, List> aggregateEvents = eventStorage.get(aggregateType);
             if (aggregateEvents.containsKey(aggregateId)) {
                 List<PersistedEvent<A, E>> events = (List<PersistedEvent<A, E>>) aggregateEvents.get(aggregateId);
-                if (sequenceNumberConflicts(expectedSequenceNumber, events)) {
+                if (aggregateHasBeenModified(expectedSequenceNumber, events)) {
                     CompletableFuture<List<PersistedEvent<A, E>>> completableFuture = new CompletableFuture<>();
                     completableFuture.completeExceptionally(new OptimisticConcurrencyException());
                     return completableFuture;
@@ -74,15 +70,32 @@ public class DummyEventStore implements EventStore {
         }
 
         Map<AggregateId, List> aggregateEvents = eventStorage.get(aggregateType);
-        // TODO: Complete updating the event store
+
+        if (aggregateEvents == null) {
+            aggregateEvents = new HashMap<>();
+            eventStorage.put(aggregateType, aggregateEvents);
+        }
+
+        List events = aggregateEvents.get(aggregateId);
+
+        if (events == null) {
+            events = new ArrayList<>();
+            aggregateEvents.put(aggregateId, events);
+        }
+
+        events.addAll(persistedEvents);
 
         return CompletableFuture.completedFuture(persistedEvents);
     }
 
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean sequenceNumberConflicts(
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
             Long expectedSequenceNumber,
             List<PersistedEvent<A, E>> events) {
-        return events.stream().filter(evt -> evt.sequenceNumber().equals(expectedSequenceNumber)).findFirst().isPresent();
+        if (events.size() > 0) {
+            PersistedEvent<A, E> mostRecentEvent = events.get(events.size() - 1);
+            return !mostRecentEvent.sequenceNumber().equals(expectedSequenceNumber);
+        }
+        return false;
     }
 
     private class DummyPersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {

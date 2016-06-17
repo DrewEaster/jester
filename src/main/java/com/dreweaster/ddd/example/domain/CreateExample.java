@@ -17,4 +17,11 @@ public class CreateExample extends ExampleCommand {
     public String exampleString() {
         return exampleString;
     }
+
+    @Override
+    public String toString() {
+        return "CreateExample{" +
+                "exampleString='" + exampleString + '\'' +
+                '}';
+    }
 }
