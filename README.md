@@ -1,2 +1,4 @@
-# jester
-Reactive DDD/CQRS/Eventsourcing library for Java
+# Jester
+#### Reactive DDD, CQRS and Eventsourcing library for Java
+
+Jester

@@ -2,7 +2,7 @@ package com.dreweaster.ddd.framework;
 
 import java.time.LocalDate;
 
-public class CommandDeduplicationStrategyFactoryImpl implements CommandDeduplicationStrategyFactory {
+public class TwentyFourHourWindowCommandDeduplicationStrategyFactory implements CommandDeduplicationStrategyFactory {
 
     @Override
     public CommandDeduplicationStrategyBuilder newBuilder() {

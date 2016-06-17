@@ -1,34 +1,31 @@
 package com.dreweaster.ddd.framework;
 
+import org.reactivestreams.Publisher;
+import rx.Observable;
+import rx.RxReactiveStreams;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.stream.Collectors;
 
 
 public class DummyEventStore implements EventStore {
 
-    private Map<Class, Map<AggregateId, List>> eventStorage = new HashMap<>();
+    private Map<Class, List> eventStorage = new HashMap<>();
 
-    @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> CompletionStage<List<PersistedEvent<A, E>>> loadEvents(
             Class<A> aggregateType,
             AggregateId aggregateId) {
 
-        if (eventStorage.containsKey(aggregateType)) {
-            Map<AggregateId, List> aggregateEvents = eventStorage.get(aggregateType);
-            if (aggregateEvents.containsKey(aggregateId)) {
-                List events = aggregateEvents.get(aggregateId);
-                return CompletableFuture.completedFuture((List<PersistedEvent<A, E>>) events);
-            }
-        }
-
-        return CompletableFuture.completedFuture(Collections.<PersistedEvent<A, E>>emptyList());
+        return CompletableFuture.completedFuture(persistedEventsFor(aggregateType, aggregateId));
     }
 
     @SuppressWarnings("unchecked")
@@ -41,16 +38,10 @@ public class DummyEventStore implements EventStore {
             Long expectedSequenceNumber) {
 
         // Optimistic concurrency check
-        if (eventStorage.containsKey(aggregateType)) {
-            Map<AggregateId, List> aggregateEvents = eventStorage.get(aggregateType);
-            if (aggregateEvents.containsKey(aggregateId)) {
-                List<PersistedEvent<A, E>> events = (List<PersistedEvent<A, E>>) aggregateEvents.get(aggregateId);
-                if (aggregateHasBeenModified(expectedSequenceNumber, events)) {
-                    CompletableFuture<List<PersistedEvent<A, E>>> completableFuture = new CompletableFuture<>();
-                    completableFuture.completeExceptionally(new OptimisticConcurrencyException());
-                    return completableFuture;
-                }
-            }
+        if (aggregateHasBeenModified(aggregateType, aggregateId, expectedSequenceNumber)) {
+            CompletableFuture<List<PersistedEvent<A, E>>> completableFuture = new CompletableFuture<>();
+            completableFuture.completeExceptionally(new OptimisticConcurrencyException());
+            return completableFuture;
         }
 
         List<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
@@ -69,33 +60,141 @@ public class DummyEventStore implements EventStore {
             nextSequenceNumber = nextSequenceNumber + 1;
         }
 
-        Map<AggregateId, List> aggregateEvents = eventStorage.get(aggregateType);
+        List aggregateEvents = eventStorage.get(aggregateType);
 
         if (aggregateEvents == null) {
-            aggregateEvents = new HashMap<>();
+            aggregateEvents = new ArrayList<>();
             eventStorage.put(aggregateType, aggregateEvents);
         }
 
-        List events = aggregateEvents.get(aggregateId);
-
-        if (events == null) {
-            events = new ArrayList<>();
-            aggregateEvents.put(aggregateId, events);
-        }
-
-        events.addAll(persistedEvents);
+        aggregateEvents.addAll(persistedEvents);
 
         return CompletableFuture.completedFuture(persistedEvents);
     }
 
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Publisher<StreamEvent<A, E>> stream(
+            Class<A> aggregateType,
+            Optional<Long> fromOffsetOpt) {
+
+        // TODO: Need to implement polling loop
+        // TODO: Where should configuration for polling frequency live?
+        // TODO: Polling frequency could be something you can specify as a parameter to this method?
+        // TODO: Consumers of a stream care most about polling frequency
+
+        List<StreamEvent<A, E>> streamEvents = streamEventsFor(aggregateType);
+
+        Long fromOffset = fromOffsetOpt.orElse(0L);
+
+        if (fromOffset <= streamEvents.size()) {
+
+            List<StreamEvent<A, E>> fromOffsetEvents = streamEvents.subList(
+                    fromOffset.intValue(),
+                    streamEvents.size());
+
+            // FIXME: This doesn't work - subscribers aren't seeing events
+            return RxReactiveStreams.toPublisher(Observable.from(fromOffsetEvents));
+        }
+
+        return RxReactiveStreams.toPublisher(Observable.from(Collections.emptyList()));
+    }
+
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<StreamEvent<A, E>> streamEventsFor(Class<A> aggregateType) {
+        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
+        List<StreamEvent<A, E>> streamEvents = new ArrayList<>();
+        for (long i = 0; i < persistedEvents.size(); i++) {
+            streamEvents.add(new DummyStreamEvent<>(persistedEvents.get(Long.valueOf(i).intValue()), i));
+        }
+        return streamEvents;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
+            Class<A> aggregateType) {
+
+        List<PersistedEvent<A, E>> aggregateEvents = (List<PersistedEvent<A, E>>) eventStorage.get(aggregateType);
+
+        if (aggregateEvents == null) {
+            aggregateEvents = new ArrayList<>();
+            eventStorage.put(aggregateType, aggregateEvents);
+        }
+
+        return aggregateEvents;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
+            Class<A> aggregateType,
+            AggregateId aggregateId) {
+
+        if (eventStorage.containsKey(aggregateType)) {
+            List<PersistedEvent<A, E>> aggregateEvents = (List<PersistedEvent<A, E>>) eventStorage.get(aggregateType);
+            if (aggregateEvents != null) {
+                return aggregateEvents.stream().filter(persistedEvent ->
+                        persistedEvent.aggregateId().equals(aggregateId)).collect(Collectors.toList());
+            }
+        }
+
+        return Collections.emptyList();
+    }
+
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
-            Long expectedSequenceNumber,
-            List<PersistedEvent<A, E>> events) {
-        if (events.size() > 0) {
-            PersistedEvent<A, E> mostRecentEvent = events.get(events.size() - 1);
+            Class<A> aggregateType,
+            AggregateId aggregateId,
+            Long expectedSequenceNumber) {
+        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType, aggregateId);
+        if (persistedEvents.size() > 0) {
+            PersistedEvent<A, E> mostRecentEvent = persistedEvents.get(persistedEvents.size() - 1);
             return !mostRecentEvent.sequenceNumber().equals(expectedSequenceNumber);
         }
         return false;
+    }
+
+    private class DummyStreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements StreamEvent<A, E> {
+
+        private PersistedEvent<A, E> persistedEvent;
+
+        private long offset;
+
+        public DummyStreamEvent(PersistedEvent<A, E> persistedEvent, long offset) {
+            this.persistedEvent = persistedEvent;
+            this.offset = offset;
+        }
+
+        @Override
+        public Long offset() {
+            return offset;
+        }
+
+        @Override
+        public Class<A> aggregateType() {
+            return persistedEvent.aggregateType();
+        }
+
+        @Override
+        public AggregateId aggregateId() {
+            return persistedEvent.aggregateId();
+        }
+
+        @Override
+        public CommandId commandId() {
+            return persistedEvent.commandId();
+        }
+
+        @Override
+        public E rawEvent() {
+            return persistedEvent.rawEvent();
+        }
+
+        @Override
+        public LocalDate timestamp() {
+            return persistedEvent.timestamp();
+        }
+
+        @Override
+        public Long sequenceNumber() {
+            return persistedEvent.sequenceNumber();
+        }
     }
 
     private class DummyPersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {

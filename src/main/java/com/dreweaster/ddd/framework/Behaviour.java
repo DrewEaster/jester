@@ -1,5 +1,6 @@
 package com.dreweaster.ddd.framework;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -13,8 +14,10 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
 
     private Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = new HashMap<>();
 
+    // TODO: Is there some way this can be avoided?
     private Map<Class, BiConsumer> untypedCommandHandlers = new HashMap<>();
 
+    // TODO: Is there some way this can be avoided?
     private Map<Class, BiFunction> untypedEventHandlers = new HashMap<>();
 
     public Behaviour(
@@ -24,8 +27,10 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
         this.state = state;
         this.commandHandlers = commandHandlers;
         this.eventHandlers = eventHandlers;
-        this.untypedCommandHandlers = new HashMap<>(commandHandlers);
-        this.untypedEventHandlers = new HashMap<>(eventHandlers);
+
+        // TODO: Nasty hack to overlook my inability to work around the generic type system
+        this.untypedCommandHandlers = Collections.unmodifiableMap(commandHandlers);
+        this.untypedEventHandlers = Collections.unmodifiableMap(eventHandlers);
     }
 
     public State state() {
@@ -49,7 +54,7 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
     }
 
     /**
-     * @return new instance with the given currentState
+     * @return new instance with the given newState
      */
     public Behaviour withState(State newState) {
         return new Behaviour<>(newState, commandHandlers, eventHandlers);

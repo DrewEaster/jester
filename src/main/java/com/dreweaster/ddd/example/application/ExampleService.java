@@ -2,6 +2,7 @@ package com.dreweaster.ddd.example.application;
 
 import com.dreweaster.ddd.example.domain.CreateExample;
 import com.dreweaster.ddd.example.domain.ExampleAggregate;
+import com.dreweaster.ddd.framework.AggregateId;
 import com.dreweaster.ddd.framework.CommandEnvelope;
 import com.dreweaster.ddd.framework.CommandHandlerFactory;
 
@@ -15,9 +16,9 @@ public class ExampleService {
         this.commandHandlerFactory = commandHandlerFactory;
     }
 
-    public CompletionStage<Void> createExample(CommandEnvelope<CreateExample> commandEnvelope) {
+    public CompletionStage<AggregateId> createExample(CommandEnvelope<CreateExample> commandEnvelope) {
         return commandHandlerFactory.handlerFor(ExampleAggregate.class)
                 .handle(commandEnvelope)
-                .thenApply(events -> null);
+                .thenApply(events -> commandEnvelope.aggregateId());
     }
 }
