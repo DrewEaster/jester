@@ -9,9 +9,15 @@ Jester's design is sympathetic to those wishing to follow the [hexagonal archite
 
 ## User Manual
 
-### Persistence
+### The basics
 
-#### Eventsourcing
+Jester is a DDD library containing a set of abstractions to help you build an eventsourced domain model. It is the intention for Jester to be an enabler of event-driven systems. The key concepts you'll encounter are:
+
+* ***Aggregates*** - An aggregate defines a cluster of entities and value objects that form a consistency boundary within which you can enforce business invariants. Aggregates handle commands and emit events in reaction to those commands. In DDD, it's so important to model behaviours, not data. Jester provides a simple behaviour oriented abstraction that helps you to focus on implementing aggregates with a behavioural slant.
+
+* ***Commands*** - A command describes an action to do something, e.g. CreateOrder. They should always be phrased in the correct tense, ensuring it's clear a command is a call to do something, not describe something that has happened. Commands are sent to aggregates to trigger a transition in state/behaviour.
+
+* ***Events*** - An event describes something that has happened, the result of an action having taken place. Events are emitted by aggregates in response to having processed a command. They should always be phrased in past tense, e.g. OrderCreated.
 
 ### Aggregates
 
@@ -28,6 +34,8 @@ Jester's design is sympathetic to those wishing to follow the [hexagonal archite
 #### Executing commands
 
 #### Idempotency
+
+#### Optimistic concurrency
 
 ##### Deduplication strategies
 
