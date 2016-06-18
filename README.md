@@ -62,22 +62,19 @@ A builder needs to be instantiated with an initial _pre-creation_ state. To cont
 ```java
 public class UserState {
 
-    public static UserState EMPTY = of("","","");
+    public static UserState EMPTY = of("","");
 
-    public static UserState of(String username, String password, String salt) {
-        return new UserState(username, password, salt);
+    public static UserState of(String username, String password) {
+        return new UserState(username, password);
     }
 
     private String username;
     
     private String password;
-    
-    private String salt;
 
-    private UserState(String username, String password, String salt) {
+    private UserState(String username, String password) {
         this.username = username;
         this.password = password;
-        this.salt = salt;
     }
 }
 ```
@@ -101,20 +98,17 @@ In our example here, we're going to define the initial behaviour of our `User` a
 ```java
 public class RegisterUser extends UserCommand {
 
-    public static RegisterUser of(String username, String password, String salt) {
-        return new RegisterUser(username, password, salt);
+    public static RegisterUser of(String username, String password) {
+        return new RegisterUser(username, password);
     }
 
     private String username;
     
     private String password;
-    
-    private String salt;
 
-    public RegisterUser(String username, String password, String salt) {
+    public RegisterUser(String username, String password) {
         this.username = username;
         this.password = password;
-        this.salt = salt;
     }
 
     public String getUsername() {
@@ -123,10 +117,6 @@ public class RegisterUser extends UserCommand {
 
     public String getPassword() {
         return password;
-    }
-
-    public String getSalt() {
-        return salt;
     }
 }
 ```
@@ -136,20 +126,17 @@ In response to this command, we want our aggregate to emit a `UserRegistered` ev
 ```java
 public class UserRegistered extends UserEvent {
 
-    public static UserRegistered of(String username, String password, String salt) {
-        return new UserRegistered(username, password, salt);
+    public static UserRegistered of(String username, String password) {
+        return new UserRegistered(username, password);
     }
 
     private String username;
 
     private String password;
 
-    private String salt;
-
-    public UserRegistered(String username, String password, String salt) {
+    public UserRegistered(String username, String password) {
         this.username = username;
         this.password = password;
-        this.salt = salt;
     }
 
     public String getUsername() {
@@ -158,10 +145,6 @@ public class UserRegistered extends UserEvent {
 
     public String getPassword() {
         return password;
-    }
-
-    public String getSalt() {
-        return salt;
     }
 }
 ```
@@ -172,11 +155,10 @@ Now that we've defined the command and event, we can add a command handler to th
 behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) ->
         ctx.success(UserRegistered.of(
                 cmd.getUsername(),
-                cmd.getPassword(),
-                cmd.getSalt())));
+                cmd.getPassword())));
 ```
 
-You'll notice that we receive a `CommandContext` to which we respond with the event (or events) that's the result of handling the command. If handling a command results in some kind of business logic error, you can respond with `ctx.error(Throwable error)` instead of responding with events.
+You'll notice that we receive a `CommandContext` to which we respond with the event (or events) we wish to emit as a result of handling the command. If handling a command results in some kind of business logic error, you can respond with `ctx.error(Throwable error)` instead of responding with events.
 
 You'll notice that we don't modify the enclosing aggregate's state within the command handler. This is the responsibility of an event handler.
 
