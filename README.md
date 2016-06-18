@@ -31,7 +31,7 @@ To define an aggregate, you need to extend the `Aggregate` abstract class, and s
 *  The base class for events that the aggregate emits (should be an abstract class extending `DomainEvent`)
 *  The class that defines the internal state of the aggregate
 
-We create an aggregate like this:
+We define an aggregate like this:
 
 ```java
 public class UserAggregate extends Aggregate<UserCommand, UserEvent, UserState> {
@@ -40,10 +40,19 @@ public class UserAggregate extends Aggregate<UserCommand, UserEvent, UserState> 
 
 #### Defining behaviour
 
-The next step is to start defining our aggregate's behaviour using the behaviour-oriented DSL. Broadly speaking, behaviour is defined by command handlers and event handlers. Let's explore each concept separately.
+The next step is to start defining our aggregate's behaviour using the behaviour-oriented DSL.
+
+At any point in time, an instancr of an aggregate has a current `Behaviour`. Behaviour is an abstraction that can be seen somewhat like specific state in a state machine. A `Behaviour` is composed of three things:
+
+* The current state of the aggregate instance
+* A number of command handlers that define how the behaviour handles commands sent to it
+* A number of event handlers that define how the behaviour translates events into updates of local state and, optionally, the shift to a new behaviour.
+
+Broadly speaking, a behaviour is defined by command handlers and event handlers. Let's explore each concept separately.
 
 ##### Command Handlers
 
+Communication with an aggregate instance is only achievable via commands, and so we need to first define 
 
 ##### Events
 
