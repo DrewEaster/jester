@@ -42,13 +42,21 @@ public class UserAggregate extends Aggregate<UserCommand, UserEvent, UserState> 
 
 The next step is to start defining our aggregate's behaviour using the behaviour-oriented DSL.
 
-At any point in time, an instancr of an aggregate has a current `Behaviour`. Behaviour is an abstraction that can be seen somewhat like specific state in a state machine. A `Behaviour` is composed of three things:
+At any point in time, an instance of an aggregate has a current `Behaviour`. Behaviour is an abstraction that can be seen somewhat like specific state in a state machine. As an aggregate handles commands over time, it can switch between behaviours. A `Behaviour` is composed of three things:
 
 * The current state of the aggregate instance
-* A number of command handlers that define how the behaviour handles commands sent to it
-* A number of event handlers that define how the behaviour translates events into updates of local state and, optionally, the shift to a new behaviour.
+* Command handlers that define how the behaviour handles commands sent to it
+* Event handlers that define how the behaviour translates events into changes in the aggregate's state and, optionally, the shift to a new behaviour (analogous to switching a state machine to a new state).
 
-Broadly speaking, a behaviour is defined by command handlers and event handlers. Let's explore each concept separately.
+An aggregate must start off with an initial behaviour. This is  the way an instance of the aggregate should behave before it has processed its first command. This is essentially the aggregate's _pre-creation_ behaviour. To define this initial behaviour, we need to implement the abstract `initialBehaviour()` method from the `Aggregate` base class.
+
+```java
+@Override
+protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
+}
+```
+
+Jester enables a simple builder pattern for defining the command and event handlers that make up a `Behaviour`. The method `newBehaviourBuilder()` from the abstract base class is your friend.
 
 ##### Command Handlers
 
