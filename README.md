@@ -55,7 +55,37 @@ protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
 }
 ```
 
-Jester enables a simple builder pattern for defining the command and event handlers that make up a `Behaviour`. The method `newBehaviourBuilder()` from the abstract base class is your friend.
+Jester enables a simple builder pattern for defining the command and event handlers that make up a `Behaviour`. The method `newBehaviourBuilder(State state)` from the abstract base class is your friend.
+
+A builder needs to be instantiated with an initial _pre-creation_ state. To continue with our example, let's define `UserState` and create a singleton instance to represent the initial empty state:
+
+```java
+public class UserState {
+
+    public static UserState EMPTY = of("","");
+
+    public static UserState of(String username, String password) {
+        return new UserState(username, password);
+    }
+
+    private String username;
+    
+    private String password;
+
+    private UserState(String username, String password) {
+        this.username = username;
+        this.password = password;
+    }
+}
+```
+
+Then, we can instantiate a new `BehaviourBuilder` as part of defining the initial behaviour for the `UserAggregate`:
+
+```java
+protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
+   BehaviourBuilder<UserCommand, UserEvent, UserState> behaviourBuilder = newBehaviourBuilder(UserState.EMPTY);
+}
+```
 
 ##### Command Handlers
 
