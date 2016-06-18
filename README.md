@@ -166,7 +166,7 @@ public class UserRegistered extends UserEvent {
 }
 ```
 
-Now that we've defined the command and event, we can define our initial behaviour to our behaviour builder:
+Now that we've defined the command and event, we can add a command handler to the behaviour builder:
 
 ```java
 behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) ->
@@ -176,7 +176,11 @@ behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) ->
                 cmd.getSalt())));
 ```
 
-##### Events
+You'll notice that we receive a `CommandContext` to which we respond with the event (or events) that's the result of handling the command. If handling a command results in some kind of business logic error, you can respond with `ctx.error(Throwable error)` instead of responding with events.
+
+You'll notice that we don't modify the enclosing aggregate's state within the command handler. This is the responsibility of an event handler.
+
+##### Event handlers
 
 ##### Testing
 
