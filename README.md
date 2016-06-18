@@ -93,7 +93,7 @@ We're now ready to define our first command handler!
 
 A command handler's responsibility is to handle an incoming command, apply the business logic of the aggregate, and emit one or more events that describe what happened. As an aggregate may behave differently - i.e. can transition over time between different `Behaviour`s - each behaviour can define different command handlers (although it's perfectly ok for different behaviours to share some command handlers).
 
-In our example here, we're going to define the initial behaviour of our `User` aggregate. The initial behaviour captures the state of the aggregate before the user has been registered to use our product, and, as such, the only command applicable to this behaviour is `RegisterUser`. As a convention, Jester encourages you to drop extensions such as _Command_ and _Event_ from the class names of your commands and events. Make sure your class names capture intent without the need for superfluous extenions.
+In our example here, we're going to define the initial behaviour of our `User` aggregate. The initial behaviour captures the state of the aggregate before the user has been registered to use our product, and, as such, the only command applicable to this behaviour is `RegisterUser`. As a convention, Jester encourages you to drop extensions such as _Aggregate_, _Command_ and _Event_ from the class names of your aggregates, commands and events. Make sure your class names capture intent without the need for superfluous extenions.
 
 ```java
 public class RegisterUser extends UserCommand {
@@ -160,7 +160,7 @@ behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) ->
 
 You'll notice that we receive a `CommandContext` to which we respond with the event (or events) we wish to emit as a result of handling the command. If handling a command results in some kind of business logic error, you can respond with `ctx.error(Throwable error)` instead of responding with events.
 
-You'll notice that we don't modify the enclosing aggregate's state within the command handler. This is the responsibility of an event handler.
+We don't modify the enclosing aggregate's state within the command handler. This is the responsibility of an event handler.
 
 ##### Event handlers
 
