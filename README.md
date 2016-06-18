@@ -94,9 +94,93 @@ We're now ready to define our first command handler!
 
 ##### Command Handlers
 
-Communication with an aggregate instance is only achievable via commands, and so we need to first define 
+A command handler's responsibility is to handle an incoming command, apply the business logic of the aggregate, and emit one or more events that describe what happened. As an aggregate may behave differently - i.e. can transition over time between different `Behaviour`s - each behaviour can define different command handlers (although it's perfectly ok for different behaviours to share some command handlers).
 
-##### Events
+In our example here, we're going to define the initial behaviour of our `UserAggregate`. The initial behaviour captures the state of the aggregate before the user has been registered to use our product, and, as such, the only command applicable to this behaviour is `RegisterUser`. As a convention, Jester encourages you to drop extensions such as _Command_ and _Event_ from the class names of your commands and events. Make sure your class names capture intent without the need for superfluous extenions.
+
+```java
+public class RegisterUser extends UserCommand {
+
+    public static RegisterUser of(String username, String password, String salt) {
+        return new RegisterUser(username, password, salt);
+    }
+
+    private String username;
+    
+    private String password;
+    
+    private String salt;
+
+    public RegisterUser(String username, String password, String salt) {
+        this.username = username;
+        this.password = password;
+        this.salt = salt;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public String getSalt() {
+        return salt;
+    }
+}
+```
+
+In response to this command, we want our aggregate to emit a `UserRegistered` event:
+
+```java
+public class UserRegistered extends UserEvent {
+
+    public static UserRegistered of(String username, String password, String salt) {
+        return new UserRegistered(username, password, salt);
+    }
+
+    private String username;
+
+    private String password;
+
+    private String salt;
+
+    public UserRegistered(String username, String password, String salt) {
+        this.username = username;
+        this.password = password;
+        this.salt = salt;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public String getSalt() {
+        return salt;
+    }
+}
+```
+
+Now that we've defined the command and event, we can add a command handler to the behaviour builder:
+
+```java
+behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) ->
+        ctx.success(UserRegistered.of(
+                cmd.getUsername(),
+                cmd.getPassword(),
+                cmd.getSalt())));
+```
+
+You'll notice that we receive a `CommandContext` to which we respond with the event (or events) that's the result of handling the command. If handling a command results in some kind of business logic error, you can respond with `ctx.error(Throwable error)` instead of responding with events.
+
+You'll notice that we don't modify the enclosing aggregate's state within the command handler. This is the responsibility of an event handler.
+
+##### Event handlers
 
 ##### Testing
 
