@@ -166,15 +166,17 @@ We don't modify the enclosing aggregate's state within the command handler. This
 
 ##### Testing
 
-### Command Handling
+### Sending commands from your application
 
-#### Executing commands
+#### Aggregate repositories
+
+#### Dispatching commands
 
 #### Idempotency
 
-#### Optimistic concurrency
-
 ##### Deduplication strategies
+
+#### Optimistic concurrency
 
 ### The Read-side (CQRS)
 
