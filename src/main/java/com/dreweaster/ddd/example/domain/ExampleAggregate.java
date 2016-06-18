@@ -4,53 +4,49 @@ import com.dreweaster.ddd.framework.Aggregate;
 import com.dreweaster.ddd.framework.Behaviour;
 import com.dreweaster.ddd.framework.BehaviourBuilder;
 
-import java.util.Optional;
-
+// TODO: Deal with snapshots when implemented
 public class ExampleAggregate extends Aggregate<ExampleCommand, ExampleEvent, Example> {
 
     public static class AlreadyCreated extends RuntimeException {
     }
 
     @Override
-    protected Behaviour<ExampleCommand, ExampleEvent, Example> initialBehaviour(Optional<Example> snapshotState) {
-        // TODO: Deal with snapshots when implemented
-        return new UncreatedBehaviourFactory().create();
+    protected Behaviour<ExampleCommand, ExampleEvent, Example> initialBehaviour() {
+        return preCreationBehaviour();
     }
 
     /**
-     * Factory for creating UncreatedBehaviour
+     * This is the pre-created behaviour, prior to any commands being handled
+     *
+     * @return the uncreated behaviour
      */
-    public class UncreatedBehaviourFactory {
+    public Behaviour<ExampleCommand, ExampleEvent, Example> preCreationBehaviour() {
 
-        public Behaviour<ExampleCommand, ExampleEvent, Example> create() {
+        BehaviourBuilder<ExampleCommand, ExampleEvent, Example> behaviourBuilder =
+                newBehaviourBuilder(Example.EMPTY_STATE);
 
-            BehaviourBuilder<ExampleCommand, ExampleEvent, Example> behaviourBuilder =
-                    newBehaviourBuilder(Example.EMPTY_STATE);
+        behaviourBuilder.setCommandHandler(CreateExample.class, (cmd, ctx) ->
+                ctx.success(ExampleCreated.of(cmd.exampleString())));
 
-            behaviourBuilder.setCommandHandler(CreateExample.class, (cmd, ctx) ->
-                    ctx.success(ExampleCreated.of(cmd.exampleString())));
+        behaviourBuilder.setEventHandler(ExampleCreated.class, (evt, currentBehaviour) ->
+                createdBehaviour(Example.of(evt.exampleString())));
 
-            behaviourBuilder.setEventHandler(ExampleCreated.class, (evt, currentBehaviour) ->
-                    new CreatedBehaviourFactory().create(Example.of(evt.exampleString())));
-
-            return behaviourBuilder.build();
-        }
+        return behaviourBuilder.build();
     }
 
     /**
-     * Factory for creating CreatedBehaviour
+     * This is the post-created behaviour
+     *
+     * @param state the state of the aggregate
+     * @return the post-created behaviour
      */
-    public class CreatedBehaviourFactory {
+    public Behaviour<ExampleCommand, ExampleEvent, Example> createdBehaviour(Example state) {
+        BehaviourBuilder<ExampleCommand, ExampleEvent, Example> behaviourBuilder =
+                newBehaviourBuilder(state);
 
-        public Behaviour<ExampleCommand, ExampleEvent, Example> create(Example state) {
+        behaviourBuilder.setCommandHandler(CreateExample.class, (cmd, ctx)
+                -> ctx.error(new AlreadyCreated()));
 
-            BehaviourBuilder<ExampleCommand, ExampleEvent, Example> behaviourBuilder =
-                    newBehaviourBuilder(state);
-
-            behaviourBuilder.setCommandHandler(CreateExample.class, (cmd, ctx)
-                    -> ctx.error(new AlreadyCreated()));
-
-            return behaviourBuilder.build();
-        }
+        return behaviourBuilder.build();
     }
 }

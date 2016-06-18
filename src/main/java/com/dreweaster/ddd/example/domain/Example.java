@@ -6,7 +6,7 @@ public class Example {
         return new Example(exampleString);
     }
 
-    public static Example EMPTY_STATE = new Example("");
+    public static Example EMPTY_STATE = of("");
 
     private String exampleString;
 
