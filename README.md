@@ -17,13 +17,84 @@ Jester is a DDD library containing a set of abstractions to help you build an ev
 
 * ***Commands*** - A command describes an action to do something, e.g. CreateOrder. They should always be phrased in the correct tense, ensuring it's clear a command is a call to do something, not describe something that has happened. Commands are sent to aggregates to trigger a transition in state/behaviour.
 
-* ***Events*** - An event describes something that has happened, the result of an action having taken place. Events are emitted by aggregates in response to having processed a command. They should always be phrased in past tense, e.g. OrderCreated.
+* ***Events*** - An event describes something that has happened, the result of an action having taken place. Events are emitted by aggregates in response to having processed a command. They should always be phrased in past tense, e.g. OrderCreated. It's perfectly feasible for a single command sent to an aggregate to result in many events being emitted.
 
 ### Aggregates
 
+An aggregate defines a cluster of entities and value objects that form a consistency boundary within which you can enforce business invariants. In Jester, transactionality is only applied around the conistency boundary of a single aggregate instance - you can't update multiple aggregates in a single transaction. Where changes in one aggregate instance need to result in changes in another, this must be achieved an an eventually consistent, event-driven way.
+
+DDD encourages modelling behaviours, which is opposed to the more traditional way developers tend to model domains (using a data-oriented approach). Jester enforces that aggregates are defined in a behaviour-oriented way using an abstraction inspired greatly by the Persistent Entity concept within the [Lagom Framework](http://lagomframework.com).
+
+To define an aggregate, you need to extend the `Aggregate` abstract class, and specify three type parameters:
+
+*  The base class for commands that the aggregate handles (should be an abstract class extending `DomainComamnd`)
+*  The base class for events that the aggregate emits (should be an abstract class extending `DomainEvent`)
+*  The class that defines the internal state of the aggregate
+
+We define an aggregate like this:
+
+```java
+public class UserAggregate extends Aggregate<UserCommand, UserEvent, UserState> {
+}
+```
+
 #### Defining behaviour
 
-##### Commands
+The next step is to start defining our aggregate's behaviour using the behaviour-oriented DSL.
+
+At any point in time, an instance of an aggregate has a current `Behaviour`. Behaviour is an abstraction that can be seen somewhat like specific state in a state machine. As an aggregate handles commands over time, it can switch between behaviours. A `Behaviour` is composed of three things:
+
+* The current state of the aggregate instance
+* Command handlers that define how the behaviour handles commands sent to it
+* Event handlers that define how the behaviour translates events into changes in the aggregate's state and, optionally, the shift to a new behaviour (analogous to switching a state machine to a new state).
+
+An aggregate must start off with an initial behaviour. This is  the way an instance of the aggregate should behave before it has processed its first command. This is essentially the aggregate's _pre-creation_ behaviour. To define this initial behaviour, we need to implement the abstract `initialBehaviour()` method from the `Aggregate` base class.
+
+```java
+protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
+}
+```
+
+Jester enables a simple builder pattern for defining the command and event handlers that make up a `Behaviour`. The method `newBehaviourBuilder(State state)` from the abstract base class is your friend.
+
+A builder needs to be instantiated with an initial _pre-creation_ state. To continue with our example, let's define `UserState` and create a singleton instance to represent the initial empty state:
+
+```java
+public class UserState {
+
+    public static UserState EMPTY = of("","","");
+
+    public static UserState of(String username, String password, String salt) {
+        return new UserState(username, password, salt);
+    }
+
+    private String username;
+    
+    private String password;
+    
+    private String salt;
+
+    private UserState(String username, String password, String salt) {
+        this.username = username;
+        this.password = password;
+        this.salt = salt;
+    }
+}
+```
+
+Then, we can instantiate a new `BehaviourBuilder` as part of defining the initial behaviour for the `UserAggregate`:
+
+```java
+protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
+   BehaviourBuilder<UserCommand, UserEvent, UserState> behaviourBuilder = newBehaviourBuilder(UserState.EMPTY);
+}
+```
+
+We're now ready to define our first command handler!
+
+##### Command Handlers
+
+Communication with an aggregate instance is only achievable via commands, and so we need to first define 
 
 ##### Events
 
