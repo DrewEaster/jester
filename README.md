@@ -51,7 +51,7 @@ At any point in time, an instance of an aggregate has a current `Behaviour`. Beh
 An aggregate must start off with an initial behaviour. This is  the way an instance of the aggregate should behave before it has processed its first command. This is essentially the aggregate's _pre-creation_ behaviour. To define this initial behaviour, we need to implement the abstract `initialBehaviour()` method from the `Aggregate` base class.
 
 ```java
-protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
+public Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
 }
 ```
 
