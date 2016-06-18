@@ -34,7 +34,7 @@ To define an aggregate, you need to extend the `Aggregate` abstract class, and s
 We define an aggregate like this:
 
 ```java
-public class UserAggregate extends Aggregate<UserCommand, UserEvent, UserState> {
+public class User extends Aggregate<UserCommand, UserEvent, UserState> {
 }
 ```
 
@@ -82,7 +82,7 @@ public class UserState {
 }
 ```
 
-Then, we can instantiate a new `BehaviourBuilder` as part of defining the initial behaviour for the `UserAggregate`:
+Then, we can instantiate a new `BehaviourBuilder` as part of defining the initial behaviour for the `User` aggregate:
 
 ```java
 protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
@@ -96,7 +96,7 @@ We're now ready to define our first command handler!
 
 A command handler's responsibility is to handle an incoming command, apply the business logic of the aggregate, and emit one or more events that describe what happened. As an aggregate may behave differently - i.e. can transition over time between different `Behaviour`s - each behaviour can define different command handlers (although it's perfectly ok for different behaviours to share some command handlers).
 
-In our example here, we're going to define the initial behaviour of our `UserAggregate`. The initial behaviour captures the state of the aggregate before the user has been registered to use our product, and, as such, the only command applicable to this behaviour is `RegisterUser`. As a convention, Jester encourages you to drop extensions such as _Command_ and _Event_ from the class names of your commands and events. Make sure your class names capture intent without the need for superfluous extenions.
+In our example here, we're going to define the initial behaviour of our `User` aggregate. The initial behaviour captures the state of the aggregate before the user has been registered to use our product, and, as such, the only command applicable to this behaviour is `RegisterUser`. As a convention, Jester encourages you to drop extensions such as _Command_ and _Event_ from the class names of your commands and events. Make sure your class names capture intent without the need for superfluous extenions.
 
 ```java
 public class RegisterUser extends UserCommand {
