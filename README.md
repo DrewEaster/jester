@@ -62,19 +62,22 @@ A builder needs to be instantiated with an initial _pre-creation_ state. To cont
 ```java
 public class UserState {
 
-    public static UserState EMPTY = of("","");
+    public static UserState EMPTY = of("","","");
 
-    public static UserState of(String username, String password) {
-        return new UserState(username, password);
+    public static UserState of(String username, String password, String salt) {
+        return new UserState(username, password, salt);
     }
 
     private String username;
     
     private String password;
+    
+    private String salt;
 
-    private UserState(String username, String password) {
+    private UserState(String username, String password, String salt) {
         this.username = username;
         this.password = password;
+        this.salt = salt;
     }
 }
 ```
@@ -86,6 +89,8 @@ protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
    BehaviourBuilder<UserCommand, UserEvent, UserState> behaviourBuilder = newBehaviourBuilder(UserState.EMPTY);
 }
 ```
+
+We're now ready to define our first command handler!
 
 ##### Command Handlers
 
