@@ -82,7 +82,7 @@ public class UserState {
 Then, we can instantiate a new `BehaviourBuilder` as part of defining the initial behaviour for the `User` aggregate:
 
 ```java
-protected Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
+public Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
    BehaviourBuilder<UserCommand, UserEvent, UserState> behaviourBuilder = newBehaviourBuilder(UserState.EMPTY);
 }
 ```
