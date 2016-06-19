@@ -164,7 +164,15 @@ We don't modify the enclosing aggregate's state within the command handler. This
 
 ##### Event handlers
 
-It's really important when we're using eventsourcing that we separate command handling from event handling. With command handling, you're applying business logic and making a decision to either transition an aggregate's state/behaviour (by emitting events), or reject the command due to violation of business invariants. The role of event handling is to define how the events emitted from command handling, are replayed to actually modify the aggregate's state ready for further commands to be processed.
+It's really important when we're using eventsourcing that we separate command handling from event handling. With command handling, we're applying business logic and making a decision to either transition an aggregate's state/behaviour (by emitting events), or reject the command due to violation of business invariants. The role of event handling is to define how the events emitted from command handling are replayed to bring an aggregate up to its current state ready for further commands to be processed. It's important to separate these two stages because we can't trust modifying the internal state of the aggregate until we're sure events emitted by comamnd handling have been successfully persisted to an underlying event store. Jester entirely abstracts away persistence concerns, but this requires that the Jester behaviour DSL separates the two stages. 
+
+It's really important to note that event handlers can't fail and must be side effect free. As events are a fact, something that has already happened, we can't possibly reject them during replay. Thus, it's imperative that you fail fast when replaying events if there's a problem - you can't just ignore a failed event and move onto further events. In such a case, your aggregate would be in an inconsistent state when processing the next command. Event handling should, therefore, be very dumb - nothing more than simple code that takes a sequence of events, applying each event one by one to reach a cumulative view of an aggregate's current state. Event handlers must be side effect free because they are called everytime an aggregate is recovered from the underlying event store, and you definitely wouldn't want any side effects to be triggered every time that happens!
+
+
+
+
+
+
 
 ##### Testing
 
