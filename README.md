@@ -164,6 +164,8 @@ We don't modify the enclosing aggregate's state within the command handler. This
 
 ##### Event handlers
 
+It's really important when we're using eventsourcing that we separate command handling from event handling. With command handling, you're applying business logic and making a decision to either transition an aggregate's state/behaviour (by emitting events), or reject the command due to violation of business invariants. The role of event handling is to define how the events emitted from command handling, are replayed to actually modify the aggregate's state ready for further commands to be processed.
+
 ##### Testing
 
 ### Sending commands from your application
