@@ -1,9 +1,12 @@
-package com.dreweaster.jester.eventstore;
+package com.dreweaster.jester.infrastructure.eventstore;
 
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.DomainEvent;
+import com.dreweaster.jester.application.eventstore.EventStore;
+import com.dreweaster.jester.application.eventstore.PersistedEvent;
+import com.dreweaster.jester.application.eventstore.StreamEvent;
 import org.reactivestreams.Publisher;
 import rx.Observable;
 import rx.RxReactiveStreams;

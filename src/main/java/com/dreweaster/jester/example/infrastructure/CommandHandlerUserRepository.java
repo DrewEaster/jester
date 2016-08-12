@@ -5,8 +5,8 @@ import com.dreweaster.jester.example.domain.UserCommand;
 import com.dreweaster.jester.example.domain.UserEvent;
 import com.dreweaster.jester.example.domain.UserRepository;
 import com.dreweaster.jester.example.domain.UserState;
-import com.dreweaster.jester.commandhandler.AbstractCommandHandlerAggregateRepository;
-import com.dreweaster.jester.commandhandler.CommandHandlerFactory;
+import com.dreweaster.jester.application.commandhandler.AbstractCommandHandlerAggregateRepository;
+import com.dreweaster.jester.application.commandhandler.CommandHandlerFactory;
 
 public class CommandHandlerUserRepository
         extends AbstractCommandHandlerAggregateRepository<User, UserCommand, UserEvent, UserState>

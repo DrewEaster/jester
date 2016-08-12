@@ -1,6 +1,6 @@
-package com.dreweaster.jester.commandhandler;
+package com.dreweaster.jester.application.commandhandler;
 
-import com.dreweaster.jester.eventstore.PersistedEvent;
+import com.dreweaster.jester.application.eventstore.PersistedEvent;
 
 /**
  */

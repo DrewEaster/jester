@@ -1,13 +1,13 @@
-package com.dreweaster.jester.commandhandler;
+package com.dreweaster.jester.application.commandhandler;
 
+import com.dreweaster.jester.application.eventstore.EventStore;
+import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.Behaviour;
 import com.dreweaster.jester.domain.CommandContext;
 import com.dreweaster.jester.domain.DomainCommand;
 import com.dreweaster.jester.domain.DomainEvent;
-import com.dreweaster.jester.eventstore.EventStore;
-import com.dreweaster.jester.eventstore.PersistedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

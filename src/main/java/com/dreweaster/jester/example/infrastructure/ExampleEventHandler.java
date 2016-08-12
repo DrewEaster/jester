@@ -1,14 +1,14 @@
 package com.dreweaster.jester.example.infrastructure;
 
-import com.dreweaster.jester.commandhandler.CommandDeduplicationStrategyFactory;
-import com.dreweaster.jester.commandhandler.CommandHandlerFactory;
-import com.dreweaster.jester.commandhandler.DeduplicatingCommandHandlerFactory;
-import com.dreweaster.jester.commandhandler.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
+import com.dreweaster.jester.application.commandhandler.CommandDeduplicationStrategyFactory;
+import com.dreweaster.jester.application.commandhandler.CommandHandlerFactory;
+import com.dreweaster.jester.application.commandhandler.DeduplicatingCommandHandlerFactory;
+import com.dreweaster.jester.application.commandhandler.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.eventstore.DummyEventStore;
-import com.dreweaster.jester.eventstore.EventStore;
-import com.dreweaster.jester.eventstore.StreamEvent;
+import com.dreweaster.jester.infrastructure.eventstore.DummyEventStore;
+import com.dreweaster.jester.application.eventstore.EventStore;
+import com.dreweaster.jester.application.eventstore.StreamEvent;
 import com.dreweaster.jester.example.application.ExampleService;
 import com.dreweaster.jester.example.domain.RegisterUser;
 import com.dreweaster.jester.example.domain.User;

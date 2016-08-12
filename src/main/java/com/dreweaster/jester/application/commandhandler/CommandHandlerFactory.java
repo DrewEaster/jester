@@ -1,4 +1,4 @@
-package com.dreweaster.jester.commandhandler;
+package com.dreweaster.jester.application.commandhandler;
 
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.DomainCommand;

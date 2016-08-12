@@ -1,4 +1,4 @@
-package com.dreweaster.jester.eventstore;
+package com.dreweaster.jester.application.eventstore;
 
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.DomainEvent;

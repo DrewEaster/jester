@@ -1,7 +1,7 @@
-package com.dreweaster.jester.commandhandler;
+package com.dreweaster.jester.application.commandhandler;
 
+import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.eventstore.PersistedEvent;
 
 import java.time.LocalDate;
 import java.util.HashSet;

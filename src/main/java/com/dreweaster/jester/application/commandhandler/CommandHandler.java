@@ -1,9 +1,9 @@
-package com.dreweaster.jester.commandhandler;
+package com.dreweaster.jester.application.commandhandler;
 
+import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.DomainCommand;
 import com.dreweaster.jester.domain.DomainEvent;
-import com.dreweaster.jester.eventstore.PersistedEvent;
 
 import java.util.List;
 import java.util.concurrent.CompletionStage;

@@ -1,4 +1,4 @@
-package com.dreweaster.jester.commandhandler;
+package com.dreweaster.jester.application.commandhandler;
 
 public interface CommandDeduplicationStrategyFactory {
 
