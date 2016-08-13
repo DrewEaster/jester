@@ -1,13 +1,16 @@
 package com.dreweaster.jester.domain;
 
+import javaslang.control.Either;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, State> {
 
-    private Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E, State>>> commandHandlers = new HashMap<>();
+    private Map<Class<? extends C>, BiFunction<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers = new HashMap<>();
 
     private Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = new HashMap<>();
 
@@ -19,7 +22,7 @@ public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, St
 
     public BehaviourBuilder(
             State state,
-            Map<Class<? extends C>, BiConsumer<? extends C, CommandContext<E, State>>> commandHandlers,
+            Map<Class<? extends C>, BiFunction<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers,
             Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
         this.state = state;
         this.commandHandlers = commandHandlers;
@@ -27,8 +30,8 @@ public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, St
     }
 
     public <Cmd extends C> void setCommandHandler(
-            Class<Cmd> commandClass, BiConsumer<Cmd,
-            CommandContext<E, State>> handler) {
+            Class<Cmd> commandClass, BiFunction<Cmd,
+            CommandContext<E, State>, Either<Throwable, List<E>>> handler) {
 
         commandHandlers.put(commandClass, handler);
     }

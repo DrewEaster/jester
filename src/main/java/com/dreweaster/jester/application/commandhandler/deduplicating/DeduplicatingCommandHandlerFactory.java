@@ -1,5 +1,6 @@
-package com.dreweaster.jester.application.commandhandler;
+package com.dreweaster.jester.application.commandhandler.deduplicating;
 
+import com.dreweaster.jester.application.commandhandler.*;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.domain.Aggregate;
@@ -8,6 +9,7 @@ import com.dreweaster.jester.domain.Behaviour;
 import com.dreweaster.jester.domain.CommandContext;
 import com.dreweaster.jester.domain.DomainCommand;
 import com.dreweaster.jester.domain.DomainEvent;
+import javaslang.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,9 +107,6 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
         }
 
         public CompletionStage<List<E>> handle(C command) {
-
-            // TODO: Will have to deal with timeouts if context methods are never called...
-            // TODO: Prevent more than one context method being called
             CompletableFuture<List<E>> completableFuture = new CompletableFuture<>();
 
             try {
@@ -122,7 +121,7 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
 
                 final Behaviour<C, E, State> finalBehaviour = behaviour;
 
-                boolean handled = behaviour.handleCommand(command, new CommandContext<E, State>() {
+                Either<Throwable, List<E>> handled = behaviour.handleCommand(command, new CommandContext<E, State>() {
 
                     @Override
                     public State currentState() {
@@ -133,26 +132,9 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
                     public AggregateId aggregateId() {
                         return aggregateId;
                     }
-
-                    @Override
-                    public void success(List<E> events) {
-                        completableFuture.complete(events);
-                    }
-
-                    @Override
-                    public void success(E event) {
-                        completableFuture.complete(Collections.singletonList(event));
-                    }
-
-                    @Override
-                    public void error(Throwable error) {
-                        completableFuture.completeExceptionally(error);
-                    }
                 });
 
-                if (!handled) {
-                    // TODO: Need to complete exceptionally to say command was not valid for current behaviour
-                }
+                handled.bimap(completableFuture::completeExceptionally, completableFuture::complete);
 
             } catch (Exception ex) {
                 // TODO: Do we need to handle this more specifically? Caused by aggregate instance creation failure

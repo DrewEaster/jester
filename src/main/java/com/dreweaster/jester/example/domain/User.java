@@ -8,6 +8,9 @@ import com.dreweaster.jester.domain.BehaviourBuilder;
 public class User extends Aggregate<UserCommand, UserEvent, UserState> {
 
     public static class AlreadyCreated extends RuntimeException {
+        public AlreadyCreated() {
+            super("User has already been created!");
+        }
     }
 
     @Override
@@ -48,8 +51,7 @@ public class User extends Aggregate<UserCommand, UserEvent, UserState> {
         BehaviourBuilder<UserCommand, UserEvent, UserState> behaviourBuilder =
                 newBehaviourBuilder(state);
 
-        behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx)
-                -> ctx.error(new AlreadyCreated()));
+        behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) -> ctx.error(new AlreadyCreated()));
 
         return behaviourBuilder.build();
     }

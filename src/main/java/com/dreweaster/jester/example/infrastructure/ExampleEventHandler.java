@@ -1,25 +1,18 @@
 package com.dreweaster.jester.example.infrastructure;
 
-import com.dreweaster.jester.application.commandhandler.CommandDeduplicationStrategyFactory;
+import com.dreweaster.jester.application.commandhandler.deduplicating.CommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.application.commandhandler.CommandHandlerFactory;
-import com.dreweaster.jester.application.commandhandler.DeduplicatingCommandHandlerFactory;
-import com.dreweaster.jester.application.commandhandler.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
+import com.dreweaster.jester.application.commandhandler.deduplicating.DeduplicatingCommandHandlerFactory;
+import com.dreweaster.jester.application.commandhandler.deduplicating.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.infrastructure.eventstore.DummyEventStore;
 import com.dreweaster.jester.application.eventstore.EventStore;
-import com.dreweaster.jester.application.eventstore.StreamEvent;
-import com.dreweaster.jester.example.application.ExampleService;
+import com.dreweaster.jester.example.application.UserService;
 import com.dreweaster.jester.example.domain.RegisterUser;
-import com.dreweaster.jester.example.domain.User;
-import com.dreweaster.jester.example.domain.UserEvent;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
@@ -63,52 +56,25 @@ public class ExampleEventHandler {
                 eventStore,
                 commandDeduplicationStrategyFactory);
 
-        ExampleService exampleService = new ExampleService(new CommandHandlerUserRepository(commandHandlerFactory));
+        UserService userService = new UserService(new CommandHandlerUserRepository(commandHandlerFactory));
 
-        exampleService.createExample(
+        userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),
                 CommandId.of("deterministic-command-id-1"),
                 RegisterUser.of("user1", "password1")
         ).whenComplete(new ResponseHandler());
 
-        exampleService.createExample(
+        userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),
                 CommandId.of("deterministic-command-id-2"),
                 RegisterUser.of("user2", "password2")
         ).whenComplete(new ResponseHandler());
 
-        exampleService.createExample(
+        userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),
                 CommandId.of("deterministic-command-id-1"),
                 RegisterUser.of("user1", "password1")
         ).whenComplete(new ResponseHandler());
-
-        Publisher<StreamEvent<User, UserEvent>> stream =
-                eventStore.stream(User.class, Optional.<Long>empty());
-
-        // FIXME: This isn't working for whatever reason
-        stream.subscribe(new Subscriber<StreamEvent<User, UserEvent>>() {
-
-            @Override
-            public void onSubscribe(Subscription subscription) {
-                LOGGER.info("Subscribed to stream!");
-            }
-
-            @Override
-            public void onNext(StreamEvent<User, UserEvent> streamEvent) {
-                LOGGER.info(String.format("Received Event (offset=%d): %s", streamEvent.offset(), streamEvent));
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-
-            }
-
-            @Override
-            public void onComplete() {
-                LOGGER.info("Stream complete!");
-            }
-        });
     }
 
     private class ResponseHandler implements BiConsumer<AggregateId, Throwable> {
@@ -116,9 +82,9 @@ public class ExampleEventHandler {
         @Override
         public void accept(AggregateId aggregateId, Throwable throwable) {
             if (throwable != null) {
-                LOGGER.error("Error creating example!", throwable);
+                LOGGER.error("Error creating User!", throwable);
             } else {
-                LOGGER.info("Created new example with id: " + aggregateId.get());
+                LOGGER.info("Created new User with id: " + aggregateId.get());
             }
         }
     }

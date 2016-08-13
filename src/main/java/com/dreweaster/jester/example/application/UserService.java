@@ -7,21 +7,21 @@ import com.dreweaster.jester.domain.CommandId;
 
 import java.util.concurrent.CompletionStage;
 
-public class ExampleService {
+public class UserService {
 
     private UserRepository userRepository;
 
-    public ExampleService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
-    public CompletionStage<AggregateId> createExample(
+    public CompletionStage<AggregateId> createUser(
             AggregateId aggregateId,
             CommandId commandId,
             RegisterUser command) {
 
         return userRepository.aggregateRootOf(aggregateId)
-                .apply(commandId, command)
+                .handle(commandId, command)
                 .thenApply(events -> aggregateId);
     }
 }

@@ -7,9 +7,6 @@ import com.dreweaster.jester.domain.DomainEvent;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
-import org.reactivestreams.Publisher;
-import rx.Observable;
-import rx.RxReactiveStreams;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -17,7 +14,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
@@ -79,7 +75,7 @@ public class DummyEventStore implements EventStore {
         return CompletableFuture.completedFuture(persistedEvents);
     }
 
-    @Override
+    /*@Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Publisher<StreamEvent<A, E>> stream(
             Class<A> aggregateType,
             Optional<Long> fromOffsetOpt) {
@@ -104,7 +100,7 @@ public class DummyEventStore implements EventStore {
         }
 
         return RxReactiveStreams.toPublisher(Observable.from(Collections.emptyList()));
-    }
+    }*/
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<StreamEvent<A, E>> streamEventsFor(Class<A> aggregateType) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
