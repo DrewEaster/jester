@@ -1,14 +1,8 @@
-package com.dreweaster.jester.application.commandhandler.deduplicating;
+package com.dreweaster.jester.application.repository.deduplicating;
 
-import com.dreweaster.jester.application.commandhandler.*;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
-import com.dreweaster.jester.domain.Aggregate;
-import com.dreweaster.jester.domain.AggregateId;
-import com.dreweaster.jester.domain.Behaviour;
-import com.dreweaster.jester.domain.CommandContext;
-import com.dreweaster.jester.domain.DomainCommand;
-import com.dreweaster.jester.domain.DomainEvent;
+import com.dreweaster.jester.domain.*;
 import javaslang.concurrent.Future;
 import javaslang.concurrent.Promise;
 import javaslang.control.Either;
@@ -18,31 +12,42 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  */
-public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory {
+public abstract class DeduplicatingEventsourcedAggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements AggregateRepository<A, C, E, State> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DeduplicatingCommandHandlerFactory.class);
+    private Class<A> aggregateType;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DeduplicatingEventsourcedAggregateRepository.class);
 
     private EventStore eventStore;
 
     private CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory;
 
-    public DeduplicatingCommandHandlerFactory(EventStore eventStore,
-                                              CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory) {
-
+    public DeduplicatingEventsourcedAggregateRepository(
+            Class<A> aggregateType,
+            EventStore eventStore,
+            CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory) {
+        this.aggregateType = aggregateType;
         this.eventStore = eventStore;
         this.commandDeduplicationStrategyFactory = commandDeduplicationStrategyFactory;
     }
 
     @Override
-    public <A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> CommandHandler<A, C, E, State> handlerFor(Class<A> aggregateType) {
-        return new DeduplicatingCommandHandler<>(aggregateType);
+    public final AggregateRoot<C, E> aggregateRootOf(AggregateId aggregateId) {
+        return (commandId, command) -> new DeduplicatingCommandHandler(aggregateType).handle(
+                CommandEnvelope.of(
+                        aggregateId,
+                        commandId,
+                        command)
+        ).map(events -> events.stream().map(PersistedEvent::rawEvent).collect(Collectors.toList()));
     }
 
     // TODO: Snapshots will have to store last n minutes/hours/days of command ids within their payload.
-    private class DeduplicatingCommandHandler<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements CommandHandler<A, C, E, State> {
+    private class DeduplicatingCommandHandler {
 
         private Class<A> aggregateType;
 
@@ -50,7 +55,6 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
             this.aggregateType = aggregateType;
         }
 
-        @Override
         public Future<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
             // TODO: Load snapshot first (if any)
             return eventStore.loadEvents(aggregateType, command.aggregateId()).flatMap(previousEvents -> {
@@ -145,4 +149,67 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
         }
     }
 
+    public static class CommandEnvelope<T> {
+
+        public static <T> CommandEnvelope<T> of(AggregateId aggregateId, CommandId id, T payload) {
+            return new CommandEnvelope<T>(aggregateId, id, payload) {
+                @Override
+                public AggregateId aggregateId() {
+                    return super.aggregateId();
+                }
+
+                @Override
+                public CommandId id() {
+                    return super.id();
+                }
+            };
+        }
+
+        public static <T> CommandEnvelope<T> of(AggregateId aggregateId, T payload) {
+            return new CommandEnvelope<T>(aggregateId, CommandId.of(UUID.randomUUID().toString()), payload) {
+                @Override
+                public AggregateId aggregateId() {
+                    return super.aggregateId();
+                }
+
+                @Override
+                public CommandId id() {
+                    return super.id();
+                }
+            };
+        }
+
+        private AggregateId aggregateId;
+
+        private CommandId id;
+
+        private T payload;
+
+        public CommandEnvelope(AggregateId aggregateId, CommandId id, T payload) {
+            this.id = id;
+            this.aggregateId = aggregateId;
+            this.payload = payload;
+        }
+
+        public AggregateId aggregateId() {
+            return aggregateId;
+        }
+
+        public CommandId id() {
+            return id;
+        }
+
+        public T payload() {
+            return payload;
+        }
+
+        @Override
+        public String toString() {
+            return "CommandEnvelope{" +
+                    "aggregateId=" + aggregateId +
+                    ", id=" + id +
+                    ", payload=" + payload +
+                    '}';
+        }
+    }
 }

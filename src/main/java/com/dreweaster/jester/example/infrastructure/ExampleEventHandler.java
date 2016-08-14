@@ -1,12 +1,11 @@
 package com.dreweaster.jester.example.infrastructure;
 
-import com.dreweaster.jester.application.commandhandler.deduplicating.CommandDeduplicationStrategyFactory;
-import com.dreweaster.jester.application.commandhandler.CommandHandlerFactory;
-import com.dreweaster.jester.application.commandhandler.deduplicating.DeduplicatingCommandHandlerFactory;
-import com.dreweaster.jester.application.commandhandler.deduplicating.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
+import com.dreweaster.jester.application.repository.deduplicating.CommandDeduplicationStrategyFactory;
+import com.dreweaster.jester.application.repository.deduplicating.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.infrastructure.eventstore.driven.DummyEventStore;
+import com.dreweaster.jester.example.application.DeduplicatingEventsourcedUserRepository;
+import com.dreweaster.jester.infrastructure.eventstore.driven.dummy.DummyEventStore;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.example.application.UserService;
 import com.dreweaster.jester.example.domain.RegisterUser;
@@ -53,12 +52,10 @@ public class ExampleEventHandler {
         CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory =
                 new TwentyFourHourWindowCommandDeduplicationStrategyFactory();
 
-        CommandHandlerFactory commandHandlerFactory = new DeduplicatingCommandHandlerFactory(
-                eventStore,
-                commandDeduplicationStrategyFactory);
-
-        UserService userService = new UserService(new CommandHandlerUserRepository(commandHandlerFactory));
-
+        UserService userService = new UserService(
+                new DeduplicatingEventsourcedUserRepository(
+                        eventStore,
+                        commandDeduplicationStrategyFactory));
 
         userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),

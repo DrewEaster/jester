@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.eventstore.driven;
+package com.dreweaster.jester.infrastructure.eventstore.driven.dummy;
 
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.Aggregate;

@@ -1,4 +1,4 @@
-package com.dreweaster.jester.application.commandhandler.deduplicating;
+package com.dreweaster.jester.application.repository.deduplicating;
 
 import java.time.LocalDate;
 

@@ -1,4 +1,4 @@
-package com.dreweaster.jester.application.commandhandler.deduplicating;
+package com.dreweaster.jester.application.repository.deduplicating;
 
 import com.dreweaster.jester.domain.CommandId;
 
