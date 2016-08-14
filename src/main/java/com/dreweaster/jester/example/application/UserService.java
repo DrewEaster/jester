@@ -4,6 +4,7 @@ import com.dreweaster.jester.example.domain.RegisterUser;
 import com.dreweaster.jester.example.domain.UserRepository;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
+import javaslang.concurrent.Future;
 
 import java.util.concurrent.CompletionStage;
 
@@ -15,13 +16,13 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public CompletionStage<AggregateId> createUser(
+    public Future<AggregateId> createUser(
             AggregateId aggregateId,
             CommandId commandId,
             RegisterUser command) {
 
         return userRepository.aggregateRootOf(aggregateId)
                 .handle(commandId, command)
-                .thenApply(events -> aggregateId);
+                .map(events -> aggregateId);
     }
 }

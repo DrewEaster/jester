@@ -4,9 +4,9 @@ import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.DomainEvent;
+import javaslang.concurrent.Future;
 
 import java.util.List;
-import java.util.concurrent.CompletionStage;
 
 public interface EventStore {
 
@@ -14,11 +14,11 @@ public interface EventStore {
 
     }
 
-    <A extends Aggregate<?, E, ?>, E extends DomainEvent> CompletionStage<List<PersistedEvent<A, E>>> loadEvents(
+    <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
             Class<A> aggregateType,
             AggregateId aggregateId);
 
-    <A extends Aggregate<?, E, ?>, E extends DomainEvent> CompletionStage<List<PersistedEvent<A, E>>> saveEvents(
+    <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
             Class<A> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,

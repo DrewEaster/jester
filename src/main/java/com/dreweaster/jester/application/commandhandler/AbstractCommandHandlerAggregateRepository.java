@@ -23,6 +23,6 @@ public abstract class AbstractCommandHandlerAggregateRepository<A extends Aggreg
                         aggregateId,
                         commandId,
                         command)
-        ).thenApply(events -> events.stream().map(PersistedEvent::rawEvent).collect(Collectors.toList()));
+        ).map(events -> events.stream().map(PersistedEvent::rawEvent).collect(Collectors.toList()));
     }
 }

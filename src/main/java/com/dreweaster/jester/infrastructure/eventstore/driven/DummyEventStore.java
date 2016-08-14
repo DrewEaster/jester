@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.eventstore;
+package com.dreweaster.jester.infrastructure.eventstore.driven;
 
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.Aggregate;
@@ -7,6 +7,8 @@ import com.dreweaster.jester.domain.DomainEvent;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
+import javaslang.concurrent.Future;
+import javaslang.concurrent.Promise;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -14,8 +16,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 
@@ -24,16 +24,16 @@ public class DummyEventStore implements EventStore {
     private Map<Class, List> eventStorage = new HashMap<>();
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> CompletionStage<List<PersistedEvent<A, E>>> loadEvents(
+    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
             Class<A> aggregateType,
             AggregateId aggregateId) {
 
-        return CompletableFuture.completedFuture(persistedEventsFor(aggregateType, aggregateId));
+        return Future.successful(persistedEventsFor(aggregateType, aggregateId));
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> CompletionStage<List<PersistedEvent<A, E>>> saveEvents(
+    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
             Class<A> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
@@ -42,9 +42,9 @@ public class DummyEventStore implements EventStore {
 
         // Optimistic concurrency check
         if (aggregateHasBeenModified(aggregateType, aggregateId, expectedSequenceNumber)) {
-            CompletableFuture<List<PersistedEvent<A, E>>> completableFuture = new CompletableFuture<>();
-            completableFuture.completeExceptionally(new OptimisticConcurrencyException());
-            return completableFuture;
+            Promise<List<PersistedEvent<A, E>>> promise = Promise.make();
+            promise.failure(new OptimisticConcurrencyException());
+            return promise.future();
         }
 
         List<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
@@ -72,7 +72,7 @@ public class DummyEventStore implements EventStore {
 
         aggregateEvents.addAll(persistedEvents);
 
-        return CompletableFuture.completedFuture(persistedEvents);
+        return Future.successful(persistedEvents);
     }
 
     /*@Override

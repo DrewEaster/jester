@@ -9,6 +9,8 @@ import com.dreweaster.jester.domain.Behaviour;
 import com.dreweaster.jester.domain.CommandContext;
 import com.dreweaster.jester.domain.DomainCommand;
 import com.dreweaster.jester.domain.DomainEvent;
+import javaslang.concurrent.Future;
+import javaslang.concurrent.Promise;
 import javaslang.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +18,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  */
@@ -51,9 +51,9 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
         }
 
         @Override
-        public CompletionStage<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
+        public Future<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
             // TODO: Load snapshot first (if any)
-            return eventStore.loadEvents(aggregateType, command.aggregateId()).thenCompose(previousEvents -> {
+            return eventStore.loadEvents(aggregateType, command.aggregateId()).flatMap(previousEvents -> {
                 Long expectedSequenceNumber = -1L;
 
                 CommandDeduplicationStrategyBuilder commandDeduplicationStrategyBuilder =
@@ -76,7 +76,7 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
                 if (!deduplicationStrategy.isDuplicate(command.id())) {
                     final Long finalExpectedSequenceNumber = expectedSequenceNumber;
 
-                    return aggregateRootRef.handle(command.payload()).thenCompose(generatedEvents -> eventStore.saveEvents(
+                    return aggregateRootRef.handle(command.payload()).flatMap(generatedEvents -> eventStore.saveEvents(
                             aggregateType,
                             command.aggregateId(),
                             command.id(),
@@ -86,7 +86,7 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
                     // TODO: We should capture metrics about duplicated commands
                     // TODO: Capture/log/report on age of duplicate commands
                     LOGGER.info("Skipped processing duplicate command: " + command);
-                    return CompletableFuture.completedFuture(Collections.emptyList());
+                    return Future.successful(Collections.emptyList());
                 }
             });
         }
@@ -106,8 +106,8 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
             this.previousEvents = previousEvents;
         }
 
-        public CompletionStage<List<E>> handle(C command) {
-            CompletableFuture<List<E>> completableFuture = new CompletableFuture<>();
+        public Future<List<E>> handle(C command) {
+            Promise<List<E>> promise = Promise.make();
 
             try {
                 A aggregateInstance = aggregateType.newInstance();
@@ -134,14 +134,14 @@ public class DeduplicatingCommandHandlerFactory implements CommandHandlerFactory
                     }
                 });
 
-                handled.bimap(completableFuture::completeExceptionally, completableFuture::complete);
+                handled.bimap(promise::failure, promise::success);
 
             } catch (Exception ex) {
                 // TODO: Do we need to handle this more specifically? Caused by aggregate instance creation failure
-                completableFuture.completeExceptionally(ex);
+                promise.failure(ex);
             }
 
-            return completableFuture;
+            return promise.future();
         }
     }
 

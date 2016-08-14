@@ -6,14 +6,15 @@ import com.dreweaster.jester.application.commandhandler.deduplicating.Deduplicat
 import com.dreweaster.jester.application.commandhandler.deduplicating.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.infrastructure.eventstore.DummyEventStore;
+import com.dreweaster.jester.infrastructure.eventstore.driven.DummyEventStore;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.example.application.UserService;
 import com.dreweaster.jester.example.domain.RegisterUser;
+import javaslang.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  */
@@ -58,31 +59,31 @@ public class ExampleEventHandler {
 
         UserService userService = new UserService(new CommandHandlerUserRepository(commandHandlerFactory));
 
+
         userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),
                 CommandId.of("deterministic-command-id-1"),
                 RegisterUser.of("user1", "password1")
-        ).whenComplete(new ResponseHandler());
+        ).onComplete(new ResponseHandler()).await();
 
         userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),
                 CommandId.of("deterministic-command-id-2"),
                 RegisterUser.of("user2", "password2")
-        ).whenComplete(new ResponseHandler());
+        ).onComplete(new ResponseHandler()).await();
 
         userService.createUser(
                 AggregateId.of("deterministic-aggregate-id-1"),
                 CommandId.of("deterministic-command-id-1"),
                 RegisterUser.of("user1", "password1")
-        ).whenComplete(new ResponseHandler());
+        ).onComplete(new ResponseHandler());
     }
 
-    private class ResponseHandler implements BiConsumer<AggregateId, Throwable> {
-
+    private class ResponseHandler implements Consumer<Try<AggregateId>> {
         @Override
-        public void accept(AggregateId aggregateId, Throwable throwable) {
-            if (throwable != null) {
-                LOGGER.error("Error creating User!", throwable);
+        public void accept(Try<AggregateId> aggregateId) {
+            if (aggregateId.isFailure()) {
+                LOGGER.error("Error creating User!", aggregateId.get());
             } else {
                 LOGGER.info("Created new User with id: " + aggregateId.get());
             }
