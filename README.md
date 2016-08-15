@@ -168,19 +168,13 @@ It's really important when we're using eventsourcing that we separate command ha
 
 It's really important to note that event handlers can't fail and must be side effect free. As events are a fact, something that has already happened, we can't possibly reject them during replay. Thus, it's imperative that you fail fast when replaying events if there's a problem - you can't just ignore a failed event and move onto further events. In such a case, your aggregate would be in an inconsistent state when processing the next command. Event handling should, therefore, be very dumb - nothing more than simple code that takes a sequence of events, applying each event one by one to reach a cumulative view of an aggregate's current state. Event handlers must be side effect free because they are called everytime an aggregate is recovered from the underlying event store, and you definitely wouldn't want any side effects to be triggered every time that happens!
 
-
-
-
-
-
-
 ##### Testing
 
 ### Sending commands from your application
 
 #### Aggregate repositories
 
-#### Dispatching commands
+#### The Aggregate Root
 
 #### Idempotency
 
