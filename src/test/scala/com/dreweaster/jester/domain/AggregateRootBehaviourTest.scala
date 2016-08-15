@@ -1,9 +1,10 @@
 package com.dreweaster.jester.domain
 
-import org.scalatest.FunSuite
+import org.scalatest.{GivenWhenThen, FlatSpec}
 
 /**
  */
-class AggregateRootBehaviourTest extends FunSuite {
+class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen {
 
+  "An aggregate root" should "generate "
 }

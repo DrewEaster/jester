@@ -17,17 +17,17 @@ import java.util.stream.Collectors;
 
 /**
  */
-public abstract class DeduplicatingEventsourcedAggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements AggregateRepository<A, C, E, State> {
+public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements AggregateRepository<A, C, E, State> {
 
     private Class<A> aggregateType;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DeduplicatingEventsourcedAggregateRepository.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(CommandDeduplicatingEventsourcedAggregateRepository.class);
 
     private EventStore eventStore;
 
     private CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory;
 
-    public DeduplicatingEventsourcedAggregateRepository(
+    public CommandDeduplicatingEventsourcedAggregateRepository(
             Class<A> aggregateType,
             EventStore eventStore,
             CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory) {

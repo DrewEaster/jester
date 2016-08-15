@@ -4,7 +4,7 @@ import com.dreweaster.jester.application.repository.deduplicating.CommandDedupli
 import com.dreweaster.jester.application.repository.deduplicating.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.example.application.DeduplicatingEventsourcedUserRepository;
+import com.dreweaster.jester.example.application.CommandDeduplicatingEventsourcedUserRepository;
 import com.dreweaster.jester.infrastructure.eventstore.driven.dummy.DummyEventStore;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.example.application.UserService;
@@ -53,7 +53,7 @@ public class ExampleEventHandler {
                 new TwentyFourHourWindowCommandDeduplicationStrategyFactory();
 
         UserService userService = new UserService(
-                new DeduplicatingEventsourcedUserRepository(
+                new CommandDeduplicatingEventsourcedUserRepository(
                         eventStore,
                         commandDeduplicationStrategyFactory));
 
