@@ -120,7 +120,12 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 Behaviour<C, E, State> behaviour = aggregateInstance.initialBehaviour();
 
                 for (E event : previousEvents) {
-                    behaviour = behaviour.handleEvent(event);
+                    Either<Throwable, Behaviour<C, E, State>> maybeBehaviour = behaviour.handleEvent(event);
+                    if (maybeBehaviour.isLeft()) {
+                        promise.failure(maybeBehaviour.getLeft());
+                        return promise.future();
+                    }
+                    behaviour = behaviour.handleEvent(event).get();
                 }
 
                 final Behaviour<C, E, State> finalBehaviour = behaviour;

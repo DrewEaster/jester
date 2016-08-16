@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.util.function.Consumer;
 
 /**
+ * TODO: Why does the application not shut down straight away?
  */
 public class ExampleEventHandler {
 

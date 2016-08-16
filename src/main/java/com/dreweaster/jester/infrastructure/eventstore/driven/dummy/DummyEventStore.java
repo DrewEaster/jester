@@ -11,6 +11,7 @@ import javaslang.concurrent.Future;
 import javaslang.concurrent.Promise;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,6 +23,30 @@ import java.util.stream.Collectors;
 public class DummyEventStore implements EventStore {
 
     private Map<Class, List> eventStorage = new HashMap<>();
+
+    private boolean loadErrorState = false;
+
+    private boolean saveErrorState = false;
+
+    public void reset() {
+        eventStorage.clear();
+    }
+
+    public void toggleLoadErrorStateOn() {
+        loadErrorState = true;
+    }
+
+    public void toggleLoadErrorStateOff() {
+        loadErrorState = false;
+    }
+
+    public void toggleSaveErrorStateOn() {
+        saveErrorState = true;
+    }
+
+    public void toggleSaveErrorStateOff() {
+        saveErrorState = false;
+    }
 
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
@@ -195,7 +220,7 @@ public class DummyEventStore implements EventStore {
         }
 
         @Override
-        public LocalDate timestamp() {
+        public LocalDateTime timestamp() {
             return persistedEvent.timestamp();
         }
 
@@ -215,7 +240,7 @@ public class DummyEventStore implements EventStore {
 
         private E rawEvent;
 
-        private LocalDate timestamp = LocalDate.now();
+        private LocalDateTime timestamp = LocalDateTime.now();
 
         private Long sequenceNumber;
 
@@ -259,7 +284,7 @@ public class DummyEventStore implements EventStore {
         }
 
         @Override
-        public LocalDate timestamp() {
+        public LocalDateTime timestamp() {
             return timestamp;
         }
 

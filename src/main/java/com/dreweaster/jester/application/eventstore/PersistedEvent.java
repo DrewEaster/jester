@@ -6,6 +6,7 @@ import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.DomainEvent;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  */
@@ -21,7 +22,7 @@ public interface PersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEv
 
     E rawEvent();
 
-    LocalDate timestamp();
+    LocalDateTime timestamp();
 
     Long sequenceNumber();
 }

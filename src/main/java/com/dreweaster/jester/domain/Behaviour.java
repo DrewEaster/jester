@@ -1,12 +1,13 @@
 package com.dreweaster.jester.domain;
 
+import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.NoHandlerForCommand;
+import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.NoHandlerForEvent;
 import javaslang.control.Either;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
@@ -46,14 +47,18 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
         if (handler != null) {
             return (Either<Throwable, List<E>>) handler.apply(command, commandContext);
         } else {
-            // TODO: Think about this error case in more detail
-            return Either.left(new IllegalArgumentException("No command handler registered for given command class!"));
+            return Either.left(new NoHandlerForCommand(command));
         }
     }
 
     @SuppressWarnings("unchecked")
-    public final Behaviour<C, E, State> handleEvent(E event) {
-        return (Behaviour<C, E, State>) untypedEventHandlers.get(event.getClass()).apply(event, this);
+    public final Either<Throwable, Behaviour<C, E, State>> handleEvent(E event) {
+        BiFunction handler = untypedEventHandlers.get(event.getClass());
+        if (handler != null) {
+            return Either.right((Behaviour<C, E, State>) handler.apply(event, this));
+        } else {
+            return Either.left(new NoHandlerForEvent(event));
+        }
     }
 
     /**
