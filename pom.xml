@@ -13,11 +13,11 @@
     </properties>
 
     <dependencies>
-        <dependency>
+        <!--<dependency>
             <groupId>io.reactivex</groupId>
             <artifactId>rxjava</artifactId>
             <version>1.1.5</version>
-        </dependency>
+        </dependency>-->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -28,11 +28,11 @@
             <artifactId>logback-classic</artifactId>
             <version>1.1.7</version>
         </dependency>
-        <dependency>
+        <!--<dependency>
             <groupId>io.reactivex</groupId>
             <artifactId>rxjava-reactive-streams</artifactId>
             <version>1.0.1</version>
-        </dependency>
+        </dependency>-->
         <dependency>
             <groupId>io.javaslang</groupId>
             <artifactId>javaslang</artifactId>
@@ -48,6 +48,12 @@
             <artifactId>scalatest_2.11</artifactId>
             <version>3.0.0</version>
             <scope>test</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.google.inject/guice -->
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>3.0</version>
         </dependency>
     </dependencies>
 

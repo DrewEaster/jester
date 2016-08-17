@@ -11,12 +11,8 @@ public interface CommandContext<E extends DomainEvent, State> {
 
     AggregateId aggregateId();
 
-    default Either<Throwable, List<E>> success(List<E> events) {
-        return Either.right(events);
-    }
-
-    default Either<Throwable, List<E>> success(E event) {
-        return success(Arrays.asList(event));
+    default Either<Throwable, List<E>> success(E... events) {
+        return Either.right(Arrays.asList(events));
     }
 
     default Either<Throwable, List<E>> error(Throwable error) {

@@ -12,6 +12,8 @@ public class UserState {
 
     private String password;
 
+    private int failedLoginAttempts = 0;
+
     private UserState(String username, String password) {
         this.username = username;
         this.password = password;
@@ -25,7 +27,17 @@ public class UserState {
         return password;
     }
 
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
     public UserState withNewPassword(String newPassword) {
         return UserState.of(username, newPassword);
+    }
+
+    public UserState withIncrementedFailedLoginAttempts() {
+        UserState newState = UserState.of(username, password);
+        newState.failedLoginAttempts = failedLoginAttempts + 1;
+        return newState;
     }
 }

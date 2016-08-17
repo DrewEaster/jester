@@ -9,7 +9,17 @@ import com.dreweaster.jester.domain.CommandId;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class AlwaysDeduplicateStrategyFactory implements CommandDeduplicationStrategyFactory {
+public final class SwitchableDeduplicationStrategyFactory implements CommandDeduplicationStrategyFactory {
+
+    private boolean deduplicationEnabled = true;
+
+    public void toggleDeduplicationOn() {
+        deduplicationEnabled = true;
+    }
+
+    public void toggleDeduplicationOff() {
+        deduplicationEnabled = false;
+    }
 
     @Override
     public CommandDeduplicationStrategyBuilder newBuilder() {
@@ -25,7 +35,10 @@ public final class AlwaysDeduplicateStrategyFactory implements CommandDeduplicat
 
             @Override
             public CommandDeduplicationStrategy build() {
-                return commandIdList::contains;
+                if (deduplicationEnabled) {
+                    return commandIdList::contains;
+                }
+                return commandId -> false;
             }
         };
     }

@@ -2,10 +2,10 @@ package com.dreweaster.jester.domain
 
 import javaslang.concurrent.Future
 
-import com.dreweaster.jester.application.{AlwaysDeduplicateStrategyFactory, CommandDeduplicatingEventsourcedUserRepository}
+import com.dreweaster.jester.application.{SwitchableDeduplicationStrategyFactory, CommandDeduplicatingEventsourcedUserRepository}
 import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForEvent, NoHandlerForCommand}
 import com.dreweaster.jester.domain.User.AlreadyRegistered
-import com.dreweaster.jester.infrastructure.eventstore.driven.dummy.DummyEventStore
+import com.dreweaster.jester.infrastructure.MockEventStore
 import org.scalatest.{Matchers, BeforeAndAfter, GivenWhenThen, FlatSpec}
 
 /**
@@ -15,14 +15,17 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   // Dummy Event Store will implicitly ensure that sequence numbers are handled correctly in the repository impl.
   // An OptimisticCurrencyException will be returned if the code passed the incorrect expected sequence number
   // to the event store when saving generated events.
-  val eventStore = new DummyEventStore()
+  val eventStore = new MockEventStore()
 
-  val userRepository = new CommandDeduplicatingEventsourcedUserRepository(eventStore, new AlwaysDeduplicateStrategyFactory)
+  val deduplicationStrategyFactory = new SwitchableDeduplicationStrategyFactory
+
+  val userRepository = new CommandDeduplicatingEventsourcedUserRepository(eventStore, deduplicationStrategyFactory)
 
   before {
     eventStore.reset()
     eventStore.toggleLoadErrorStateOff()
     eventStore.toggleSaveErrorStateOff()
+    deduplicationStrategyFactory.toggleDeduplicationOn()
   }
 
   "An AggregateRoot" should "be createable for the first time" in {
@@ -54,6 +57,21 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     And("the emitted event should correctly refer to some existing state")
     futureEvents.get().size() should be(1)
     futureEvents.get().get(0) should be(PasswordChanged.of("changedPassword", "password"))
+  }
+
+  it should "support emitting multiple events for a single input command" in {
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+    await(user.handle(CommandId.of("command_id_1"), RegisterUser.of("joebloggs", "password")))
+    await(user.handle(CommandId.of("command_id_2"), IncrementFailedLoginAttempts.make()))
+    await(user.handle(CommandId.of("command_id_3"), IncrementFailedLoginAttempts.make()))
+    await(user.handle(CommandId.of("command_id_4"), IncrementFailedLoginAttempts.make()))
+
+    val futureEvents = await(user.handle(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.make()))
+
+    futureEvents.isSuccess should be(true)
+    futureEvents.get().size() should be(2)
+    futureEvents.get().get(0) should be(FailedLoginAttemptsIncremented.make())
+    futureEvents.get().get(1) should be(UserLocked.make())
   }
 
   it should "ignore a command with a previously handled command id and of the same command type" in {
@@ -169,7 +187,21 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   }
 
   it should "process a duplicate command if the deduplication strategy says it's ok to process it" in {
+    Given("the deduplication strategy is not configured to perform deduplication")
+    deduplicationStrategyFactory.toggleDeduplicationOff()
 
+    And("an aggregate")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+
+    When("sending the two commands with the same command id")
+    await(user.handle(CommandId.of("command_id"), ChangePassword.of("newPassword")))
+    val futureEvents = await(user.handle(CommandId.of("command_id"), ChangePassword.of("anotherNewPassword")))
+
+    Then("the second command will not be deduplicated")
+    futureEvents.isSuccess should be(true)
+    futureEvents.get().size() should be(1)
+    futureEvents.get().get(0) should be(PasswordChanged.of("anotherNewPassword", "newPassword"))
   }
 
   private def await[T](future: Future[T]) = {
