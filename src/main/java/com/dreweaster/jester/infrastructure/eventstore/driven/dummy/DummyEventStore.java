@@ -53,6 +53,11 @@ public class DummyEventStore implements EventStore {
             Class<A> aggregateType,
             AggregateId aggregateId) {
 
+        if (loadErrorState) {
+            Promise<List<PersistedEvent<A, E>>> promise = Promise.make();
+            promise.failure(new OptimisticConcurrencyException());
+            return Future.failed(new IllegalStateException());
+        }
         return Future.successful(persistedEventsFor(aggregateType, aggregateId));
     }
 
@@ -65,39 +70,41 @@ public class DummyEventStore implements EventStore {
             List<E> rawEvents,
             Long expectedSequenceNumber) {
 
-        // Optimistic concurrency check
-        if (aggregateHasBeenModified(aggregateType, aggregateId, expectedSequenceNumber)) {
-            Promise<List<PersistedEvent<A, E>>> promise = Promise.make();
-            promise.failure(new OptimisticConcurrencyException());
-            return promise.future();
+        if (saveErrorState) {
+            return Future.failed(new IllegalStateException());
+        } else {
+            // Optimistic concurrency check
+            if (aggregateHasBeenModified(aggregateType, aggregateId, expectedSequenceNumber)) {
+                return Future.failed(new OptimisticConcurrencyException());
+            }
+
+            List<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
+
+            Long nextSequenceNumber = expectedSequenceNumber + 1;
+
+            for (E rawEvent : rawEvents) {
+                persistedEvents.add(new DummyPersistedEvent<>(
+                        aggregateType,
+                        aggregateId,
+                        commandId,
+                        rawEvent,
+                        nextSequenceNumber
+                ));
+
+                nextSequenceNumber = nextSequenceNumber + 1;
+            }
+
+            List aggregateEvents = eventStorage.get(aggregateType);
+
+            if (aggregateEvents == null) {
+                aggregateEvents = new ArrayList<>();
+                eventStorage.put(aggregateType, aggregateEvents);
+            }
+
+            aggregateEvents.addAll(persistedEvents);
+
+            return Future.successful(persistedEvents);
         }
-
-        List<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
-
-        Long nextSequenceNumber = expectedSequenceNumber + 1;
-
-        for (E rawEvent : rawEvents) {
-            persistedEvents.add(new DummyPersistedEvent<>(
-                    aggregateType,
-                    aggregateId,
-                    commandId,
-                    rawEvent,
-                    nextSequenceNumber
-            ));
-
-            nextSequenceNumber = nextSequenceNumber + 1;
-        }
-
-        List aggregateEvents = eventStorage.get(aggregateType);
-
-        if (aggregateEvents == null) {
-            aggregateEvents = new ArrayList<>();
-            eventStorage.put(aggregateType, aggregateEvents);
-        }
-
-        aggregateEvents.addAll(persistedEvents);
-
-        return Future.successful(persistedEvents);
     }
 
     /*@Override

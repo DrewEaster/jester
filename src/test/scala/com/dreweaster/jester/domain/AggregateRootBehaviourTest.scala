@@ -21,6 +21,8 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
 
   before {
     eventStore.reset()
+    eventStore.toggleLoadErrorStateOff()
+    eventStore.toggleSaveErrorStateOff()
   }
 
   "An AggregateRoot" should "be createable for the first time" in {
@@ -133,11 +135,37 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   }
 
   it should "propagate error when event store fails to load events" in {
+    Given("the event store can't load events")
+    eventStore.toggleLoadErrorStateOn()
 
+    And("an aggregate")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+
+    When("sending a command")
+    val futureEvents = await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+
+    Then("the command should fail")
+    futureEvents.isSuccess should be(false)
+
+    And("the event store's error should be returned")
+    futureEvents.getCause.get shouldBe an[IllegalStateException]
   }
 
   it should "propagate error when event store fails to save generated events" in {
+    Given("the event store can't load events")
+    eventStore.toggleSaveErrorStateOn()
 
+    And("an aggregate")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+
+    When("sending a command")
+    val futureEvents = await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+
+    Then("the command should fail")
+    futureEvents.isSuccess should be(false)
+
+    And("the event store's error should be returned")
+    futureEvents.getCause.get shouldBe an[IllegalStateException]
   }
 
   it should "process a duplicate command if the deduplication strategy says it's ok to process it" in {
