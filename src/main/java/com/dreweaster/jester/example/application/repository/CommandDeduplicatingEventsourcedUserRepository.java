@@ -3,11 +3,12 @@ package com.dreweaster.jester.example.application.repository;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.repository.deduplicating.CommandDeduplicationStrategyFactory;
 import com.dreweaster.jester.application.repository.deduplicating.CommandDeduplicatingEventsourcedAggregateRepository;
-import com.dreweaster.jester.example.domain.User;
-import com.dreweaster.jester.example.domain.UserCommand;
-import com.dreweaster.jester.example.domain.UserEvent;
-import com.dreweaster.jester.example.domain.UserRepository;
-import com.dreweaster.jester.example.domain.UserState;
+import com.dreweaster.jester.example.domain.aggregates.User;
+import com.dreweaster.jester.example.domain.aggregates.UserState;
+import com.dreweaster.jester.example.domain.commands.UserCommand;
+import com.dreweaster.jester.example.domain.events.UserEvent;
+import com.dreweaster.jester.example.domain.repository.UserRepository;
+import com.dreweaster.jester.example.domain.aggregates.AbstractUserState;
 
 import javax.inject.Inject;
 

@@ -6,7 +6,7 @@ import com.dreweaster.jester.application.repository.deduplicating.TwentyFourHour
 import com.dreweaster.jester.example.application.repository.CommandDeduplicatingEventsourcedUserRepository;
 import com.dreweaster.jester.example.application.service.UserService;
 import com.dreweaster.jester.example.application.service.impl.UserServiceImpl;
-import com.dreweaster.jester.example.domain.UserRepository;
+import com.dreweaster.jester.example.domain.repository.UserRepository;
 import com.dreweaster.jester.infrastructure.eventstore.driven.dummy.DummyEventStore;
 import com.google.inject.AbstractModule;
 

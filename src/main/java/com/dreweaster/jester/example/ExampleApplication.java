@@ -4,7 +4,7 @@ import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.example.application.CommandEnvelope;
 import com.dreweaster.jester.example.application.service.UserService;
-import com.dreweaster.jester.example.domain.RegisterUser;
+import com.dreweaster.jester.example.domain.commands.RegisterUser;
 import com.dreweaster.jester.example.infrastructure.ExampleModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -35,21 +35,30 @@ public class ExampleApplication {
         userService.createUser(CommandEnvelope.of(
                         AggregateId.of("deterministic-aggregate-id-1"),
                         CommandId.of("deterministic-command-id-1"),
-                        RegisterUser.of("user1", "password1"))
+                        RegisterUser.builder()
+                                .username("user1")
+                                .password("password1")
+                                .create())
         ).onComplete(new ResponseHandler()).await();
 
         // Send same command with different command id
         userService.createUser(CommandEnvelope.of(
                         AggregateId.of("deterministic-aggregate-id-1"),
                         CommandId.of("deterministic-command-id-2"),
-                        RegisterUser.of("user2", "password2"))
+                        RegisterUser.builder()
+                                .username("user2")
+                                .password("password2")
+                                .create())
         ).onComplete(new ResponseHandler()).await();
 
         // Send same command with duplicate command id
         userService.createUser(CommandEnvelope.of(
                         AggregateId.of("deterministic-aggregate-id-1"),
                         CommandId.of("deterministic-command-id-1"),
-                        RegisterUser.of("user1", "password1"))
+                        RegisterUser.builder()
+                                .username("user1")
+                                .password("password1")
+                                .create())
         ).onComplete(new ResponseHandler()).await();
     }
 
