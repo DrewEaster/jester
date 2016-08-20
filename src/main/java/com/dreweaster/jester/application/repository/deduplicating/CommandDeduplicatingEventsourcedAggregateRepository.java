@@ -3,17 +3,15 @@ package com.dreweaster.jester.application.repository.deduplicating;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.domain.*;
+import javaslang.Tuple3;
+import javaslang.collection.List;
 import javaslang.concurrent.Future;
 import javaslang.concurrent.Promise;
 import javaslang.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  */
@@ -43,7 +41,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                         aggregateId,
                         commandId,
                         command)
-        ).map(events -> events.stream().map(PersistedEvent::rawEvent).collect(Collectors.toList()));
+        ).map(events -> events.map(PersistedEvent::rawEvent));
     }
 
     // TODO: Snapshots will have to store last n minutes/hours/days of command ids within their payload.
@@ -58,27 +56,20 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
         public Future<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
             // TODO: Load snapshot first (if any)
             return eventStore.loadEvents(aggregateType, command.aggregateId()).flatMap(previousEvents -> {
-                Long expectedSequenceNumber = -1L;
+                Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder> tuple = previousEvents.foldLeft(
+                        new Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder>(
+                                -1L, List.empty(), commandDeduplicationStrategyFactory.newBuilder()), (acc, e) ->
+                                new Tuple3<>(e.sequenceNumber(), acc._2.append(e.rawEvent()), acc._3.addEvent(e)));
 
-                CommandDeduplicationStrategyBuilder commandDeduplicationStrategyBuilder =
-                        commandDeduplicationStrategyFactory.newBuilder();
-
-                List<E> rawPreviousEvents = new ArrayList<>();
-                for (PersistedEvent<A, E> persistedEvent : previousEvents) {
-                    rawPreviousEvents.add(persistedEvent.rawEvent());
-                    commandDeduplicationStrategyBuilder.addEvent(persistedEvent);
-                    expectedSequenceNumber = persistedEvent.sequenceNumber();
-                }
-
-                CommandDeduplicationStrategy deduplicationStrategy = commandDeduplicationStrategyBuilder.build();
+                CommandDeduplicationStrategy deduplicationStrategy = tuple._3.build();
 
                 AggregateRootRef<A, C, E, State> aggregateRootRef = new AggregateRootRef<>(
                         aggregateType,
                         command.aggregateId(),
-                        rawPreviousEvents);
+                        tuple._2);
 
                 if (!deduplicationStrategy.isDuplicate(command.id())) {
-                    final Long finalExpectedSequenceNumber = expectedSequenceNumber;
+                    final Long finalExpectedSequenceNumber = tuple._1;
 
                     return aggregateRootRef.handle(command.payload()).flatMap(generatedEvents -> eventStore.saveEvents(
                             aggregateType,
@@ -90,7 +81,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                     // TODO: We should capture metrics about duplicated commands
                     // TODO: Capture/log/report on age of duplicate commands
                     LOGGER.info("Skipped processing duplicate command: " + command);
-                    return Future.successful(Collections.emptyList());
+                    return Future.successful(List.empty());
                 }
             });
         }

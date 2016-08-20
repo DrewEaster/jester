@@ -1,18 +1,16 @@
 package com.dreweaster.jester.domain;
 
+import javaslang.Function2;
+import javaslang.collection.HashMap;
+import javaslang.collection.List;
+import javaslang.collection.Map;
 import javaslang.control.Either;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 
 public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, State> {
 
-    private Map<Class<? extends C>, BiFunction<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers = new HashMap<>();
+    private Map<Class<? extends C>, Function2<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers = HashMap.empty();
 
-    private Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = new HashMap<>();
+    private Map<Class<? extends E>, Function2<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = HashMap.empty();
 
     private State state;
 
@@ -22,24 +20,24 @@ public class BehaviourBuilder<C extends DomainCommand, E extends DomainEvent, St
 
     public BehaviourBuilder(
             State state,
-            Map<Class<? extends C>, BiFunction<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers,
-            Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
+            Map<Class<? extends C>, Function2<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers,
+            Map<Class<? extends E>, Function2<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
         this.state = state;
         this.commandHandlers = commandHandlers;
         this.eventHandlers = eventHandlers;
     }
 
     public <Cmd extends C> void setCommandHandler(
-            Class<Cmd> commandClass, BiFunction<Cmd,
+            Class<Cmd> commandClass, Function2<Cmd,
             CommandContext<E, State>, Either<Throwable, List<E>>> handler) {
 
-        commandHandlers.put(commandClass, handler);
+        commandHandlers = commandHandlers.put(commandClass, handler);
     }
 
     public <Evt extends E> void setEventHandler(
             Class<Evt> eventClass,
-            BiFunction<Evt, Behaviour<C, E, State>, Behaviour<C, E, State>> handler) {
-        eventHandlers.put(eventClass, handler);
+            Function2<Evt, Behaviour<C, E, State>, Behaviour<C, E, State>> handler) {
+        eventHandlers = eventHandlers.put(eventClass, handler);
     }
 
     public Behaviour<C, E, State> build() {

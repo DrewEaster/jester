@@ -7,22 +7,18 @@ import com.dreweaster.jester.domain.DomainEvent;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
+import javaslang.Tuple2;
+import javaslang.collection.HashMap;
+import javaslang.collection.List;
+import javaslang.collection.Map;
 import javaslang.concurrent.Future;
-import javaslang.concurrent.Promise;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 
 public class DummyEventStore implements EventStore {
 
-    private Map<Class, List> eventStorage = new HashMap<>();
+    private Map<Class, List> eventStorage = HashMap.empty();
 
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
@@ -30,6 +26,14 @@ public class DummyEventStore implements EventStore {
             AggregateId aggregateId) {
 
         return Future.successful(persistedEventsFor(aggregateType, aggregateId));
+    }
+
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
+            Class<A> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
+
+        return Future.successful(persistedEventsFor(aggregateType, aggregateId)
+                .filter(event -> event.sequenceNumber() > afterSequenceNumber));
     }
 
     @SuppressWarnings("unchecked")
@@ -46,30 +50,20 @@ public class DummyEventStore implements EventStore {
             return Future.failed(new OptimisticConcurrencyException());
         }
 
-        List<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
+        List<PersistedEvent<A, E>> persistedEvents =
+                rawEvents.foldLeft(new Tuple2<Long, List<PersistedEvent<A, E>>>(expectedSequenceNumber + 1, List.empty()), (acc, e) ->
+                        new Tuple2<>(acc._1 + 1, acc._2.append(
+                                new DummyPersistedEvent<>(
+                                        aggregateType,
+                                        aggregateId,
+                                        commandId,
+                                        e,
+                                        acc._1
+                                ))))._2;
 
-        Long nextSequenceNumber = expectedSequenceNumber + 1;
-
-        for (E rawEvent : rawEvents) {
-            persistedEvents.add(new DummyPersistedEvent<>(
-                    aggregateType,
-                    aggregateId,
-                    commandId,
-                    rawEvent,
-                    nextSequenceNumber
-            ));
-
-            nextSequenceNumber = nextSequenceNumber + 1;
-        }
-
-        List aggregateEvents = eventStorage.get(aggregateType);
-
-        if (aggregateEvents == null) {
-            aggregateEvents = new ArrayList<>();
-            eventStorage.put(aggregateType, aggregateEvents);
-        }
-
-        aggregateEvents.addAll(persistedEvents);
+        eventStorage = eventStorage.put(aggregateType, eventStorage.get(aggregateType)
+                .getOrElse(List.empty())
+                .appendAll(persistedEvents));
 
         return Future.successful(persistedEvents);
     }
@@ -101,27 +95,19 @@ public class DummyEventStore implements EventStore {
         return RxReactiveStreams.toPublisher(Observable.from(Collections.emptyList()));
     }*/
 
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<StreamEvent<A, E>> streamEventsFor(Class<A> aggregateType) {
+    /*private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<StreamEvent<A, E>> streamEventsFor(Class<A> aggregateType) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
         List<StreamEvent<A, E>> streamEvents = new ArrayList<>();
         for (long i = 0; i < persistedEvents.size(); i++) {
             streamEvents.add(new DummyStreamEvent<>(persistedEvents.get(Long.valueOf(i).intValue()), i));
         }
         return streamEvents;
-    }
+    }*/
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
             Class<A> aggregateType) {
-
-        List<PersistedEvent<A, E>> aggregateEvents = (List<PersistedEvent<A, E>>) eventStorage.get(aggregateType);
-
-        if (aggregateEvents == null) {
-            aggregateEvents = new ArrayList<>();
-            eventStorage.put(aggregateType, aggregateEvents);
-        }
-
-        return aggregateEvents;
+        return eventStorage.get(aggregateType).getOrElse(List.empty());
     }
 
     @SuppressWarnings("unchecked")
@@ -129,27 +115,21 @@ public class DummyEventStore implements EventStore {
             Class<A> aggregateType,
             AggregateId aggregateId) {
 
-        if (eventStorage.containsKey(aggregateType)) {
-            List<PersistedEvent<A, E>> aggregateEvents = (List<PersistedEvent<A, E>>) eventStorage.get(aggregateType);
-            if (aggregateEvents != null) {
-                return aggregateEvents.stream().filter(persistedEvent ->
-                        persistedEvent.aggregateId().equals(aggregateId)).collect(Collectors.toList());
-            }
-        }
-
-        return Collections.emptyList();
+        return eventStorage.get(aggregateType)
+                .map(aggregateEvents -> aggregateEvents
+                        .filter(e -> ((PersistedEvent<A, E>) e).aggregateId().equals(aggregateId)))
+                .getOrElse(List.empty());
     }
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
             Class<A> aggregateType,
             AggregateId aggregateId,
             Long expectedSequenceNumber) {
-        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType, aggregateId);
-        if (persistedEvents.size() > 0) {
-            PersistedEvent<A, E> mostRecentEvent = persistedEvents.get(persistedEvents.size() - 1);
-            return !mostRecentEvent.sequenceNumber().equals(expectedSequenceNumber);
-        }
-        return false;
+
+        return persistedEventsFor(aggregateType, aggregateId)
+                .lastOption()
+                .map(event -> !event.sequenceNumber().equals(expectedSequenceNumber))
+                .getOrElse(false);
     }
 
     private class DummyStreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements StreamEvent<A, E> {

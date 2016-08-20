@@ -4,7 +4,7 @@ import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.example.application.CommandEnvelope;
 import com.dreweaster.jester.example.application.service.UserService;
-import com.dreweaster.jester.example.domain.commands.RegisterUser;
+import com.dreweaster.jester.example.domain.aggregates.user.commands.RegisterUser;
 import com.dreweaster.jester.example.infrastructure.ExampleModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;

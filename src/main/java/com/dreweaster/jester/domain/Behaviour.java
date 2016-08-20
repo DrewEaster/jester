@@ -2,39 +2,37 @@ package com.dreweaster.jester.domain;
 
 import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.NoHandlerForCommand;
 import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.NoHandlerForEvent;
+import javaslang.Function2;
+import javaslang.collection.HashMap;
+import javaslang.collection.List;
+import javaslang.collection.Map;
 import javaslang.control.Either;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.BiFunction;
 
 public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
 
     private State state;
 
-    private Map<Class<? extends C>, BiFunction<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers = new HashMap<>();
+    private Map<Class<? extends C>, Function2<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers = HashMap.empty();
 
-    private Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = new HashMap<>();
-
-    // TODO: Is there some way this can be avoided?
-    private Map<Class, BiFunction> untypedCommandHandlers = new HashMap<>();
+    private Map<Class<? extends E>, Function2<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers = HashMap.empty();
 
     // TODO: Is there some way this can be avoided?
-    private Map<Class, BiFunction> untypedEventHandlers = new HashMap<>();
+    private Map<Class, Function2> untypedCommandHandlers = HashMap.empty();
+
+    // TODO: Is there some way this can be avoided?
+    private Map<Class, Function2> untypedEventHandlers = HashMap.empty();
 
     public Behaviour(
             State state,
-            Map<Class<? extends C>, BiFunction<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers,
-            Map<Class<? extends E>, BiFunction<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
+            Map<Class<? extends C>, Function2<? extends C, CommandContext<E, State>, Either<Throwable, List<E>>>> commandHandlers,
+            Map<Class<? extends E>, Function2<? extends E, Behaviour<C, E, State>, Behaviour<C, E, State>>> eventHandlers) {
         this.state = state;
         this.commandHandlers = commandHandlers;
         this.eventHandlers = eventHandlers;
 
         // TODO: Nasty hack to overlook my inability to work around the generic type system
-        this.untypedCommandHandlers = Collections.unmodifiableMap(commandHandlers);
-        this.untypedEventHandlers = Collections.unmodifiableMap(eventHandlers);
+        this.untypedCommandHandlers = Map.narrow(commandHandlers);
+        this.untypedEventHandlers = Map.narrow(eventHandlers);
     }
 
     public State state() {
@@ -43,22 +41,21 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
 
     @SuppressWarnings("unchecked")
     public final Either<Throwable, List<E>> handleCommand(C command, CommandContext<E, State> commandContext) {
-        BiFunction handler = untypedCommandHandlers.get(command.getClass());
-        if (handler != null) {
-            return (Either<Throwable, List<E>>) handler.apply(command, commandContext);
-        } else {
-            return Either.left(new NoHandlerForCommand(command));
-        }
+        return untypedCommandHandlers.get(command.getClass()).map(handler ->
+                (Either<Throwable, List<E>>) handler.apply(command, commandContext)).getOrElse(
+                Either.left(new NoHandlerForCommand(command)));
     }
 
     @SuppressWarnings("unchecked")
     public final Either<Throwable, Behaviour<C, E, State>> handleEvent(E event) {
-        BiFunction handler = untypedEventHandlers.get(event.getClass());
-        if (handler != null) {
-            return Either.right((Behaviour<C, E, State>) handler.apply(event, this));
-        } else {
-            return Either.left(new NoHandlerForEvent(event));
-        }
+        return untypedEventHandlers.get(event.getClass())
+                .map(handler -> applyUntypedEventHandler(handler, event))
+                .getOrElse(Either.left(new NoHandlerForEvent(event)));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Either<Throwable, Behaviour<C, E, State>> applyUntypedEventHandler(Function2 eventHandler, E event) {
+        return Either.right((Behaviour<C, E, State>) eventHandler.apply(event, this));
     }
 
     /**

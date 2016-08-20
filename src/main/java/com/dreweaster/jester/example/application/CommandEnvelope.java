@@ -6,7 +6,7 @@ import com.dreweaster.jester.domain.DomainCommand;
 
 /**
  */
-public final class CommandEnvelope<C extends DomainCommand> {
+public final class  CommandEnvelope<C extends DomainCommand> {
 
     public static <C extends DomainCommand> CommandEnvelope<C> of(AggregateId aggregateId, CommandId commandId, C command) {
         return new CommandEnvelope<>(aggregateId, commandId, command);

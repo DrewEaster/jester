@@ -1,10 +1,7 @@
 package com.dreweaster.jester.domain;
 
+import javaslang.collection.List;
 import javaslang.concurrent.Future;
-import javaslang.control.Either;
-import javaslang.control.Try;
-
-import java.util.List;
 
 public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> {
 

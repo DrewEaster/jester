@@ -1,9 +1,7 @@
 package com.dreweaster.jester.domain;
 
+import javaslang.collection.List;
 import javaslang.control.Either;
-
-import java.util.Arrays;
-import java.util.List;
 
 public interface CommandContext<E extends DomainEvent, State> {
 
@@ -12,7 +10,7 @@ public interface CommandContext<E extends DomainEvent, State> {
     AggregateId aggregateId();
 
     default Either<Throwable, List<E>> success(E... events) {
-        return Either.right(Arrays.asList(events));
+        return Either.right(List.of(events));
     }
 
     default Either<Throwable, List<E>> error(Throwable error) {

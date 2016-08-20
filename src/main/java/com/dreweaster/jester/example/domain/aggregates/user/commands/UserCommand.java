@@ -1,4 +1,4 @@
-package com.dreweaster.jester.example.domain.commands;
+package com.dreweaster.jester.example.domain.aggregates.user.commands;
 
 import com.dreweaster.jester.domain.DomainCommand;
 

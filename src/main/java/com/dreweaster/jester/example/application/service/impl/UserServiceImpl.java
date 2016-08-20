@@ -2,9 +2,9 @@ package com.dreweaster.jester.example.application.service.impl;
 
 import com.dreweaster.jester.example.application.CommandEnvelope;
 import com.dreweaster.jester.example.application.service.UserService;
-import com.dreweaster.jester.example.domain.commands.RegisterUser;
-import com.dreweaster.jester.example.domain.repository.UserRepository;
 import com.dreweaster.jester.domain.AggregateId;
+import com.dreweaster.jester.example.domain.aggregates.user.commands.RegisterUser;
+import com.dreweaster.jester.example.domain.aggregates.user.repository.UserRepository;
 import javaslang.concurrent.Future;
 
 import javax.inject.Inject;

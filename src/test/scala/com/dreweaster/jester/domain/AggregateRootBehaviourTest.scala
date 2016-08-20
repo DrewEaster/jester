@@ -2,9 +2,13 @@ package com.dreweaster.jester.domain
 
 import javaslang.concurrent.Future
 
-import com.dreweaster.jester.application.{SwitchableDeduplicationStrategyFactory, CommandDeduplicatingEventsourcedUserRepository}
+import com.dreweaster.jester.application.eventstore.PersistedEvent
+import com.dreweaster.jester.application.repository.deduplicating.{CommandDeduplicationStrategy, CommandDeduplicationStrategyBuilder, CommandDeduplicationStrategyFactory}
 import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForEvent, NoHandlerForCommand}
-import com.dreweaster.jester.domain.User.AlreadyRegistered
+import com.dreweaster.jester.example.application.repository.CommandDeduplicatingEventsourcedUserRepository
+import com.dreweaster.jester.example.domain.aggregates.user.User.AlreadyRegistered
+import com.dreweaster.jester.example.domain.aggregates.user.commands.{ChangeUsername, IncrementFailedLoginAttempts, ChangePassword, RegisterUser}
+import com.dreweaster.jester.example.domain.aggregates.user.events.{UserLocked, FailedLoginAttemptsIncremented, PasswordChanged, UserRegistered}
 import com.dreweaster.jester.infrastructure.MockEventStore
 import org.scalatest.{Matchers, BeforeAndAfter, GivenWhenThen, FlatSpec}
 
@@ -33,54 +37,93 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command to create the aggregate")
-    val futureEvents = await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    val futureEvents = await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     Then("the command result should be successful")
     futureEvents.isSuccess should be(true)
 
     And("the aggregate should be created")
     futureEvents.get().size() should be(1)
-    futureEvents.get().get(0) should be(UserRegistered.of("joebloggs", "password"))
+    futureEvents.get().get(0) should be(UserRegistered.builder()
+      .username("joebloggs")
+      .password("password")
+      .create())
   }
 
   it should "be able to refer to existing state when processing a command" in {
     Given("an aggregate that has been created")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     When("sending a command that queries existing state")
-    val futureEvents = await(user.handle(CommandId.of("some_other_command_id"), ChangePassword.of("changedPassword")))
+    val futureEvents = await(user.handle(
+      CommandId.of("some_other_command_id"),
+      ChangePassword.builder()
+        .password("changedPassword")
+        .create()))
 
     Then("the command result should be successful")
     futureEvents.isSuccess should be(true)
 
     And("the emitted event should correctly refer to some existing state")
     futureEvents.get().size() should be(1)
-    futureEvents.get().get(0) should be(PasswordChanged.of("changedPassword", "password"))
+    futureEvents.get().get(0) should be(PasswordChanged.builder()
+      .password("changedPassword")
+      .oldPassword("password")
+      .create())
   }
 
   it should "support emitting multiple events for a single input command" in {
+    Given("An aggregate thats handled some commands")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(CommandId.of("command_id_1"), RegisterUser.of("joebloggs", "password")))
-    await(user.handle(CommandId.of("command_id_2"), IncrementFailedLoginAttempts.make()))
-    await(user.handle(CommandId.of("command_id_3"), IncrementFailedLoginAttempts.make()))
-    await(user.handle(CommandId.of("command_id_4"), IncrementFailedLoginAttempts.make()))
+    await(user.handle(
+      CommandId.of("command_id_1"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
-    val futureEvents = await(user.handle(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.make()))
+    await(user.handle(CommandId.of("command_id_2"), IncrementFailedLoginAttempts.of()))
+    await(user.handle(CommandId.of("command_id_3"), IncrementFailedLoginAttempts.of()))
+    await(user.handle(CommandId.of("command_id_4"), IncrementFailedLoginAttempts.of()))
 
+    When("sending a command that should lead to multiple events being emitted")
+    val futureEvents = await(user.handle(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.of()))
+
+    Then("multiple events should be emitted as expected")
     futureEvents.isSuccess should be(true)
     futureEvents.get().size() should be(2)
-    futureEvents.get().get(0) should be(FailedLoginAttemptsIncremented.make())
-    futureEvents.get().get(1) should be(UserLocked.make())
+    futureEvents.get().get(0) should be(FailedLoginAttemptsIncremented.of())
+    futureEvents.get().get(1) should be(UserLocked.of())
   }
 
   it should "ignore a command with a previously handled command id and of the same command type" in {
     Given("an aggregate created with a deterministic command id")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     When("sending the same command id again using a command of the type")
-    val futureEvents = await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    val futureEvents = await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     Then("the command result should be successful")
     futureEvents.isSuccess should be(true)
@@ -92,11 +135,19 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   it should "ignore a command with a previously handled command id and of a different command type" in {
     Given("an aggregate created with a deterministic command id")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     When("sending the same command id again using a command of a different type")
-    val futureEvents = await(user.handle(CommandId.of("some_command_id"), ChangePassword.of("newPassword")))
-    futureEvents.await()
+    val futureEvents = await(user.handle(
+      CommandId.of("some_command_id"),
+      ChangePassword.builder()
+        .password("newPassword")
+        .create()))
 
     Then("the command result should be successful")
     futureEvents.isSuccess should be(true)
@@ -108,10 +159,19 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   it should "propagate error when a command is explicitly rejected in its current behaviour" in {
     Given("an aggregate")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     When("sending a command that will be rejected in its current behaviour")
-    val futureEvents = await(user.handle(CommandId.of("some_other_command_id"), RegisterUser.of("joebloggs", "password")))
+    val futureEvents = await(user.handle(CommandId.of("some_other_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     Then("the command should fail")
     futureEvents.isSuccess should be(false)
@@ -125,7 +185,11 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command that isn't explicitly handled in its current behaviour")
-    val futureEvents = await(user.handle(CommandId.of("some_command_id"), ChangePassword.of("newPassword")))
+    val futureEvents = await(user.handle(
+      CommandId.of("some_command_id"),
+      ChangePassword.builder()
+        .password("newPassword")
+        .create()))
 
     Then("the command should fail")
     futureEvents.isSuccess should be(false)
@@ -137,13 +201,24 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   it should "generate an error during recovery when encountering an event not supported in its current behaviour" in {
     Given("an aggregate with a missing event handler")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+    await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
-    And("where the unhandled event has been persisted")
-    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
-    await(user.handle(CommandId.of("some_other_command_id"), ChangeUsername.of("johnsmith")))
+    And("the unhandled event has been persisted")
+    await(user.handle(
+      CommandId.of("some_other_command_id"),
+      ChangeUsername.builder().username("johnsmith").create()))
 
     When("sending a command")
-    val futureEvents = await(user.handle(CommandId.of("yet_another_command_id"), ChangePassword.of("newPassword")))
+    val futureEvents = await(user.handle(
+      CommandId.of("yet_another_command_id"),
+      ChangePassword.builder()
+        .password("newPassword")
+        .create()))
 
     Then("the command should fail")
     futureEvents.isSuccess should be(false)
@@ -160,7 +235,12 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command")
-    val futureEvents = await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    val futureEvents = await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     Then("the command should fail")
     futureEvents.isSuccess should be(false)
@@ -177,7 +257,12 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command")
-    val futureEvents = await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    val futureEvents = await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     Then("the command should fail")
     futureEvents.isSuccess should be(false)
@@ -192,20 +277,63 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
 
     And("an aggregate")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(CommandId.of("some_command_id"), RegisterUser.of("joebloggs", "password")))
+    await(user.handle(
+      CommandId.of("some_command_id"),
+      RegisterUser.builder()
+        .username("joebloggs")
+        .password("password")
+        .create()))
 
     When("sending the two commands with the same command id")
-    await(user.handle(CommandId.of("command_id"), ChangePassword.of("newPassword")))
-    val futureEvents = await(user.handle(CommandId.of("command_id"), ChangePassword.of("anotherNewPassword")))
+    await(user.handle(CommandId.of("command_id"), ChangePassword.builder().password("newPassword").create()))
+    val futureEvents = await(user.handle(
+      CommandId.of("command_id"),
+      ChangePassword.builder()
+        .password("anotherNewPassword")
+        .create()))
 
     Then("the second command will not be deduplicated")
     futureEvents.isSuccess should be(true)
     futureEvents.get().size() should be(1)
-    futureEvents.get().get(0) should be(PasswordChanged.of("anotherNewPassword", "newPassword"))
+    futureEvents.get().get(0) should be(PasswordChanged.builder()
+      .password("anotherNewPassword")
+      .oldPassword("newPassword").create())
   }
 
   private def await[T](future: Future[T]) = {
     future.await()
     future
   }
+
+  final class SwitchableDeduplicationStrategyFactory extends CommandDeduplicationStrategyFactory {
+
+    private var deduplicationEnabled = true
+
+    def toggleDeduplicationOn() {
+      deduplicationEnabled = true
+    }
+
+    def toggleDeduplicationOff() {
+      deduplicationEnabled = false
+    }
+
+    def newBuilder: CommandDeduplicationStrategyBuilder = {
+      new CommandDeduplicationStrategyBuilder() {
+        private var commandIds: Set[CommandId] = Set()
+
+        def addEvent(domainEvent: PersistedEvent[_, _]): CommandDeduplicationStrategyBuilder = {
+          commandIds = commandIds + domainEvent.commandId
+          this
+        }
+
+        def build: CommandDeduplicationStrategy = {
+          new CommandDeduplicationStrategy {
+            override def isDuplicate(commandId: CommandId) =
+              if (deduplicationEnabled) commandIds.contains(commandId) else false
+          }
+        }
+      }
+    }
+  }
+
 }

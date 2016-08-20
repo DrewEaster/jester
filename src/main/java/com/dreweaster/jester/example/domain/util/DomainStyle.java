@@ -17,4 +17,4 @@ import java.lang.annotation.Target;
     typeImmutable = "*", // No prefix or suffix for generated immutable type
     build = "create", // rename 'build' method on builder to 'create'
     visibility = ImplementationVisibility.PUBLIC) // Generated class will be always public
-public @interface UserDomainStyle {}
+public @interface DomainStyle {}

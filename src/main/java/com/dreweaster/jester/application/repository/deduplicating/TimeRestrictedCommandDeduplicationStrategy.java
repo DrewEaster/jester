@@ -2,15 +2,14 @@ package com.dreweaster.jester.application.repository.deduplicating;
 
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.domain.CommandId;
+import javaslang.collection.HashSet;
+import javaslang.collection.Set;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 public class TimeRestrictedCommandDeduplicationStrategy implements CommandDeduplicationStrategy {
 
-    private Set<CommandId> commandIds = new HashSet<CommandId>();
+    private Set<CommandId> commandIds = HashSet.empty();
 
     private TimeRestrictedCommandDeduplicationStrategy(Set<CommandId> commandIds) {
         this.commandIds = commandIds;
@@ -25,7 +24,7 @@ public class TimeRestrictedCommandDeduplicationStrategy implements CommandDedupl
 
         private LocalDateTime barrierDate;
 
-        private Set<CommandId> commandIds = new HashSet<CommandId>();
+        private Set<CommandId> commandIds = HashSet.empty();
 
         public Builder(LocalDateTime barrierDate) {
             this.barrierDate = barrierDate;
@@ -34,7 +33,7 @@ public class TimeRestrictedCommandDeduplicationStrategy implements CommandDedupl
         @Override
         public CommandDeduplicationStrategyBuilder addEvent(PersistedEvent<?, ?> domainEvent) {
             if (domainEvent.timestamp().isAfter(barrierDate)) {
-                commandIds.add(domainEvent.commandId());
+                commandIds = commandIds.add(domainEvent.commandId());
             }
             return this;
         }

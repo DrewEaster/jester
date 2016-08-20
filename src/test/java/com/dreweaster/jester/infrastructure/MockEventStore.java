@@ -6,24 +6,26 @@ import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.DomainEvent;
+import javaslang.Tuple2;
+import javaslang.collection.HashMap;
+import javaslang.collection.List;
+import javaslang.collection.Map;
 import javaslang.concurrent.Future;
 import javaslang.concurrent.Promise;
 
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
 
 
 public class MockEventStore implements EventStore {
 
-    private Map<Class, List> eventStorage = new HashMap<>();
+    private Map<Class, List> eventStorage = HashMap.empty();
 
     private boolean loadErrorState = false;
 
     private boolean saveErrorState = false;
 
     public void reset() {
-        eventStorage.clear();
+        eventStorage = HashMap.empty();
     }
 
     public void toggleLoadErrorStateOn() {
@@ -55,6 +57,12 @@ public class MockEventStore implements EventStore {
         return Future.successful(persistedEventsFor(aggregateType, aggregateId));
     }
 
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
+            Class<A> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
+        return loadEvents(aggregateType, aggregateId);
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
@@ -72,30 +80,20 @@ public class MockEventStore implements EventStore {
                 return Future.failed(new OptimisticConcurrencyException());
             }
 
-            List<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
+            List<PersistedEvent<A, E>> persistedEvents =
+                    rawEvents.foldLeft(new Tuple2<Long, List<PersistedEvent<A, E>>>(expectedSequenceNumber + 1, List.empty()), (acc, e) ->
+                            new Tuple2<>(acc._1 + 1, acc._2.append(
+                                    new MockPersistedEvent<>(
+                                            aggregateType,
+                                            aggregateId,
+                                            commandId,
+                                            e,
+                                            acc._1
+                                    ))))._2;
 
-            Long nextSequenceNumber = expectedSequenceNumber + 1;
-
-            for (E rawEvent : rawEvents) {
-                persistedEvents.add(new MockPersistedEvent<>(
-                        aggregateType,
-                        aggregateId,
-                        commandId,
-                        rawEvent,
-                        nextSequenceNumber
-                ));
-
-                nextSequenceNumber = nextSequenceNumber + 1;
-            }
-
-            List aggregateEvents = eventStorage.get(aggregateType);
-
-            if (aggregateEvents == null) {
-                aggregateEvents = new ArrayList<>();
-                eventStorage.put(aggregateType, aggregateEvents);
-            }
-
-            aggregateEvents.addAll(persistedEvents);
+            eventStorage = eventStorage.put(aggregateType, eventStorage.get(aggregateType)
+                    .getOrElse(List.empty())
+                    .appendAll(persistedEvents));
 
             return Future.successful(persistedEvents);
         }
@@ -106,27 +104,21 @@ public class MockEventStore implements EventStore {
             Class<A> aggregateType,
             AggregateId aggregateId) {
 
-        if (eventStorage.containsKey(aggregateType)) {
-            List<PersistedEvent<A, E>> aggregateEvents = (List<PersistedEvent<A, E>>) eventStorage.get(aggregateType);
-            if (aggregateEvents != null) {
-                return aggregateEvents.stream().filter(persistedEvent ->
-                        persistedEvent.aggregateId().equals(aggregateId)).collect(Collectors.toList());
-            }
-        }
-
-        return Collections.emptyList();
+        return eventStorage.get(aggregateType)
+                .map(aggregateEvents -> aggregateEvents
+                        .filter(e -> ((PersistedEvent<A, E>) e).aggregateId().equals(aggregateId)))
+                .getOrElse(List.empty());
     }
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
             Class<A> aggregateType,
             AggregateId aggregateId,
             Long expectedSequenceNumber) {
-        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType, aggregateId);
-        if (persistedEvents.size() > 0) {
-            PersistedEvent<A, E> mostRecentEvent = persistedEvents.get(persistedEvents.size() - 1);
-            return !mostRecentEvent.sequenceNumber().equals(expectedSequenceNumber);
-        }
-        return false;
+
+        return persistedEventsFor(aggregateType, aggregateId)
+                .lastOption()
+                .map(event -> !event.sequenceNumber().equals(expectedSequenceNumber))
+                .getOrElse(false);
     }
 
     private class MockPersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {
