@@ -10,6 +10,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import javaslang.concurrent.Future;
 import javaslang.control.Try;
+import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,11 +21,20 @@ public class ExampleApplication {
     private static final Logger LOGGER = LoggerFactory.getLogger(ExampleApplication.class);
 
     public static void main(String[] args) throws Exception {
+
+        migrateDb();
+
         ExampleApplication application = new ExampleApplication();
         application.run(Guice.createInjector(new ExampleModule()));
 
         // Shutdown the executor service used by default in Javaslang as part of handling Future callbacks
         Future.DEFAULT_EXECUTOR_SERVICE.shutdownNow();
+    }
+
+    public static void migrateDb() throws Exception {
+        Flyway flyway = new Flyway();
+        flyway.setDataSource("jdbc:postgresql://localhost/postgres", "postgres", "password");
+        flyway.migrate();
     }
 
     public void run(Injector injector) throws Exception {

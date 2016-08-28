@@ -9,7 +9,7 @@ import org.immutables.value.Value;
 @DomainStyle
 public abstract class AbstractRegisterUser implements UserCommand {
 
-    abstract String username();
+    abstract String getUsername();
 
-    abstract String password();
+    abstract String getPassword();
 }

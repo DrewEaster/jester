@@ -22,14 +22,31 @@ public interface EventStore {
             AggregateId aggregateId,
             Long afterSequenceNumber);
 
+    <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
+            Class<A> aggregateType,
+            Integer batchSize);
+
+    <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
+            Class<A> aggregateType,
+            Long afterOffset,
+            Integer batchSize);
+
+    /**
+     *
+     * @param aggregateType
+     * @param aggregateId
+     * @param commandId
+     * @param rawEvents
+     * @param expectedSequenceNumber the last known event sequence number for the corresponding aggregate. -1 to indicate
+     *                               you expect this aggregate to have no previous events
+     * @param <A> the aggregate type
+     * @param <E> the type of events this aggregate emits
+     * @return list of events that have been persisted
+     */
     <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
             Class<A> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
             List<E> rawEvents,
             Long expectedSequenceNumber);
-
-/*    <A extends Aggregate<?, E, ?>, E extends DomainEvent> Publisher<StreamEvent<A, E>> stream(
-            Class<A> aggregateType,
-            Optional<Long> fromOffset);*/
 }

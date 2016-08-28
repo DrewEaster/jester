@@ -1,5 +1,6 @@
 package com.dreweaster.jester.example.domain.util;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
 import org.immutables.value.Value.Style.ImplementationVisibility;
 
@@ -10,9 +11,8 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 @Retention(RetentionPolicy.CLASS) // Make it class retention for incremental compilation
+@JsonSerialize
 @Value.Style(
-    get = {"*", "*"}, // Detect 'get' and 'is' prefixes in accessor methods
-    init = "*", // Builder initialization methods will have 'set' prefix
     typeAbstract = {"Abstract*"}, // 'Abstract' prefix will be detected and trimmed
     typeImmutable = "*", // No prefix or suffix for generated immutable type
     build = "create", // rename 'build' method on builder to 'create'

@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.eventstore.driven.dummy;
+package com.dreweaster.jester.infrastructure.eventstore.driven.memory;
 
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.Aggregate;
@@ -16,7 +16,7 @@ import javaslang.concurrent.Future;
 import java.time.LocalDateTime;
 
 
-public class DummyEventStore implements EventStore {
+public class InMemoryEventStore implements EventStore {
 
     private Map<Class, List> eventStorage = HashMap.empty();
 
@@ -36,6 +36,28 @@ public class DummyEventStore implements EventStore {
                 .filter(event -> event.sequenceNumber() > afterSequenceNumber));
     }
 
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
+            Class<A> aggregateType,
+            Integer batchSize) {
+        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
+        return Future.successful(persistedEvents
+                .map(event -> streamEventOf(event, persistedEvents.indexOf(event)))
+                .take(batchSize));
+    }
+
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
+            Class<A> aggregateType,
+            Long afterOffset,
+            Integer batchSize) {
+        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
+        return Future.successful(persistedEvents
+                .map(event -> streamEventOf(event, persistedEvents.indexOf(event)))
+                .filter(event -> event.offset() > afterOffset)
+                .take(batchSize));
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
@@ -53,7 +75,7 @@ public class DummyEventStore implements EventStore {
         List<PersistedEvent<A, E>> persistedEvents =
                 rawEvents.foldLeft(new Tuple2<Long, List<PersistedEvent<A, E>>>(expectedSequenceNumber + 1, List.empty()), (acc, e) ->
                         new Tuple2<>(acc._1 + 1, acc._2.append(
-                                new DummyPersistedEvent<>(
+                                new SimplePersistedEvent<>(
                                         aggregateType,
                                         aggregateId,
                                         commandId,
@@ -67,42 +89,6 @@ public class DummyEventStore implements EventStore {
 
         return Future.successful(persistedEvents);
     }
-
-    /*@Override
-    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Publisher<StreamEvent<A, E>> stream(
-            Class<A> aggregateType,
-            Optional<Long> fromOffsetOpt) {
-
-        // TODO: Need to implement polling loop
-        // TODO: Where should configuration for polling frequency live?
-        // TODO: Polling frequency could be something you can specify as a parameter to this method?
-        // TODO: Consumers of a stream care most about polling frequency
-
-        List<StreamEvent<A, E>> streamEvents = streamEventsFor(aggregateType);
-
-        Long fromOffset = fromOffsetOpt.orElse(0L);
-
-        if (fromOffset <= streamEvents.size()) {
-
-            List<StreamEvent<A, E>> fromOffsetEvents = streamEvents.subList(
-                    fromOffset.intValue(),
-                    streamEvents.size());
-
-            // FIXME: This doesn't work - subscribers aren't seeing events
-            return RxReactiveStreams.toPublisher(Observable.from(fromOffsetEvents));
-        }
-
-        return RxReactiveStreams.toPublisher(Observable.from(Collections.emptyList()));
-    }*/
-
-    /*private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<StreamEvent<A, E>> streamEventsFor(Class<A> aggregateType) {
-        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
-        List<StreamEvent<A, E>> streamEvents = new ArrayList<>();
-        for (long i = 0; i < persistedEvents.size(); i++) {
-            streamEvents.add(new DummyStreamEvent<>(persistedEvents.get(Long.valueOf(i).intValue()), i));
-        }
-        return streamEvents;
-    }*/
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
@@ -132,13 +118,18 @@ public class DummyEventStore implements EventStore {
                 .getOrElse(false);
     }
 
-    private class DummyStreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements StreamEvent<A, E> {
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> StreamEvent<A, E> streamEventOf(
+            PersistedEvent<A, E> persistedEvent, long offset) {
+        return new SimpleStreamEvent<>(persistedEvent, offset);
+    }
+
+    private class SimpleStreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements StreamEvent<A, E> {
 
         private PersistedEvent<A, E> persistedEvent;
 
         private long offset;
 
-        public DummyStreamEvent(PersistedEvent<A, E> persistedEvent, long offset) {
+        public SimpleStreamEvent(PersistedEvent<A, E> persistedEvent, long offset) {
             this.persistedEvent = persistedEvent;
             this.offset = offset;
         }
@@ -184,7 +175,7 @@ public class DummyEventStore implements EventStore {
         }
     }
 
-    private class DummyPersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {
+    private class SimplePersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {
 
         private AggregateId aggregateId;
 
@@ -198,7 +189,7 @@ public class DummyEventStore implements EventStore {
 
         private Long sequenceNumber;
 
-        public DummyPersistedEvent(
+        public SimplePersistedEvent(
                 Class<A> aggregateType,
                 AggregateId aggregateId,
                 CommandId commandId,
@@ -249,7 +240,7 @@ public class DummyEventStore implements EventStore {
 
         @Override
         public String toString() {
-            return "DummyPersistedEvent{" +
+            return "SimplePersistedEvent{" +
                     "aggregateId=" + aggregateId +
                     ", aggregateType=" + aggregateType +
                     ", commandId=" + commandId +

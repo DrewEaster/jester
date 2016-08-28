@@ -2,6 +2,7 @@ package com.dreweaster.jester.infrastructure;
 
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
+import com.dreweaster.jester.application.eventstore.StreamEvent;
 import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
@@ -63,6 +64,28 @@ public class MockEventStore implements EventStore {
         return loadEvents(aggregateType, aggregateId);
     }
 
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
+            Class<A> aggregateType,
+            Integer batchSize) {
+        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
+        return Future.successful(persistedEvents
+                .map(event -> streamEventOf(event, persistedEvents.indexOf(event)))
+                .take(batchSize));
+    }
+
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
+            Class<A> aggregateType,
+            Long afterOffset,
+            Integer batchSize) {
+        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
+        return Future.successful(persistedEvents
+                .map(event -> streamEventOf(event, persistedEvents.indexOf(event)))
+                .filter(event -> event.offset() > afterOffset)
+                .take(batchSize));
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
@@ -101,6 +124,12 @@ public class MockEventStore implements EventStore {
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
+            Class<A> aggregateType) {
+        return eventStorage.get(aggregateType).getOrElse(List.empty());
+    }
+
+    @SuppressWarnings("unchecked")
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
             Class<A> aggregateType,
             AggregateId aggregateId) {
 
@@ -120,6 +149,64 @@ public class MockEventStore implements EventStore {
                 .map(event -> !event.sequenceNumber().equals(expectedSequenceNumber))
                 .getOrElse(false);
     }
+
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> StreamEvent<A, E> streamEventOf(
+            PersistedEvent<A, E> persistedEvent, long offset) {
+        return new MockStreamEvent<>(persistedEvent, offset);
+    }
+
+    private class MockStreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements StreamEvent<A, E> {
+
+        private PersistedEvent<A, E> persistedEvent;
+
+        private long offset;
+
+        public MockStreamEvent(PersistedEvent<A, E> persistedEvent, long offset) {
+            this.persistedEvent = persistedEvent;
+            this.offset = offset;
+        }
+
+        @Override
+        public Long offset() {
+            return offset;
+        }
+
+        @Override
+        public Class<A> aggregateType() {
+            return persistedEvent.aggregateType();
+        }
+
+        @Override
+        public AggregateId aggregateId() {
+            return persistedEvent.aggregateId();
+        }
+
+        @Override
+        public CommandId commandId() {
+            return persistedEvent.commandId();
+        }
+
+        @Override
+        public E rawEvent() {
+            return persistedEvent.rawEvent();
+        }
+
+        @Override
+        public Class<E> eventType() {
+            return persistedEvent.eventType();
+        }
+
+        @Override
+        public LocalDateTime timestamp() {
+            return persistedEvent.timestamp();
+        }
+
+        @Override
+        public Long sequenceNumber() {
+            return persistedEvent.sequenceNumber();
+        }
+    }
+
 
     private class MockPersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {
 
