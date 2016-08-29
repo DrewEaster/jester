@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.eventstore.driven.memory;
+package com.dreweaster.jester.infrastructure.driven.eventstore.memory;
 
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.Aggregate;
@@ -16,6 +16,7 @@ import javaslang.concurrent.Future;
 import java.time.LocalDateTime;
 
 
+// TODO: Delegate serialisation to an EventPayloadSerialiser
 public class InMemoryEventStore implements EventStore {
 
     private Map<Class, List> eventStorage = HashMap.empty();

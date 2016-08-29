@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.eventstore.driven.postgres;
+package com.dreweaster.jester.infrastructure.driven.eventstore.postgres;
 
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
@@ -7,7 +7,7 @@ import com.dreweaster.jester.domain.Aggregate;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.domain.DomainEvent;
-import com.dreweaster.jester.infrastructure.eventstore.driven.EventPayloadMapper;
+import com.dreweaster.jester.application.eventstore.EventPayloadSerialiser;
 import javaslang.Tuple2;
 import javaslang.collection.List;
 import javaslang.concurrent.Future;
@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 
 /**
+ * TODO: Aggregate types and event types - relying on straight class names is not ideal. Need immunity from refactoring
+ * TODO: Need to think about event format evolution over time
+ * TODO: Implement integration tests using Postgres started by Docker (via Maven).
  */
 public class Postgres95EventStore implements EventStore {
 
@@ -27,12 +30,12 @@ public class Postgres95EventStore implements EventStore {
 
     private ExecutorService executorService;
 
-    private EventPayloadMapper mapper;
+    private EventPayloadSerialiser serialiser;
 
-    public Postgres95EventStore(DataSource dataSource, ExecutorService executorService, EventPayloadMapper mapper) {
+    public Postgres95EventStore(DataSource dataSource, ExecutorService executorService, EventPayloadSerialiser serialiser) {
         this.dataSource = dataSource;
         this.executorService = executorService;
-        this.mapper = mapper;
+        this.serialiser = serialiser;
     }
 
     @Override
@@ -186,7 +189,7 @@ public class Postgres95EventStore implements EventStore {
             statement.setString(2, aggregateType.getName()); // TODO: storing straight class name?
             statement.setString(3, commandId.get());
             statement.setString(4, event.rawEvent().getClass().getName()); // TODO: storing straight class name?
-            statement.setString(5, mapper.serialise(event.rawEvent()));
+            statement.setString(5, serialiser.serialise(event.rawEvent()));
             statement.setTimestamp(6, Timestamp.valueOf(event.timestamp()));
             statement.setLong(7, event.sequenceNumber());
             statement.addBatch();
@@ -258,6 +261,7 @@ public class Postgres95EventStore implements EventStore {
         return statement;
     }
 
+    @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> StreamEvent<A, E> resultSetToPersistedEvent(ResultSet rs)
             throws SQLException, ClassNotFoundException {
         Long offset = rs.getLong(1);
@@ -265,7 +269,7 @@ public class Postgres95EventStore implements EventStore {
         Class<A> aggregateType = (Class<A>) Class.forName(rs.getString(3));
         CommandId commandId = CommandId.of(rs.getString(4));
         Class<E> eventType = (Class<E>) Class.forName(rs.getString(5));
-        E rawEvent = mapper.deserialise(rs.getString(6), eventType);
+        E rawEvent = serialiser.deserialise(rs.getString(6), eventType);
         LocalDateTime timestamp = rs.getTimestamp(7).toLocalDateTime();
         Long sequenceNumber = rs.getLong(8);
         return new PostgresStreamEvent<>(

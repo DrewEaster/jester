@@ -7,5 +7,5 @@ import org.immutables.value.Value;
 @DomainStyle
 public abstract class AbstractUsernameChanged implements UserEvent {
 
-    abstract String getUsername();
+    abstract String username();
 }

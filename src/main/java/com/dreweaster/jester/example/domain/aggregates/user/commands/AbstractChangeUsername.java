@@ -7,5 +7,5 @@ import org.immutables.value.Value;
 @DomainStyle
 public abstract class AbstractChangeUsername implements UserCommand {
 
-    abstract String getUsername();
+    abstract String username();
 }

@@ -7,7 +7,7 @@ import org.immutables.value.Value;
 @DomainStyle
 public abstract class AbstractPasswordChanged implements UserEvent {
 
-    abstract String getPassword();
+    abstract String password();
 
-    abstract String getOldPassword();
+    abstract String oldPassword();
 }

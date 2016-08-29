@@ -43,14 +43,14 @@ public class User extends Aggregate<UserCommand, UserEvent, UserState> {
 
         behaviourBuilder.setCommandHandler(RegisterUser.class, (cmd, ctx) ->
                 ctx.success(UserRegistered.builder()
-                        .username(cmd.getUsername())
-                        .password(cmd.getPassword())
+                        .username(cmd.username())
+                        .password(cmd.password())
                         .create()));
 
         behaviourBuilder.setEventHandler(UserRegistered.class, (evt, currentBehaviour) ->
                 createdBehaviour(currentBehaviour.state()
-                        .withUsername(evt.getUsername())
-                        .withPassword(evt.getPassword())));
+                        .withUsername(evt.username())
+                        .withPassword(evt.password())));
 
         return behaviourBuilder.build();
     }
@@ -71,14 +71,14 @@ public class User extends Aggregate<UserCommand, UserEvent, UserState> {
 
         behaviourBuilder.setCommandHandler(ChangePassword.class, (cmd, ctx) ->
                         ctx.success(PasswordChanged.builder()
-                                .password(cmd.getPassword())
+                                .password(cmd.password())
                                 .oldPassword(ctx.currentState().password())
                                 .create())
         );
 
         behaviourBuilder.setCommandHandler(ChangeUsername.class, (cmd, ctx) ->
                         ctx.success(UsernameChanged.builder()
-                                .username(cmd.getUsername())
+                                .username(cmd.username())
                                 .create())
         );
 
@@ -92,7 +92,7 @@ public class User extends Aggregate<UserCommand, UserEvent, UserState> {
 
         // Event Handlers
         behaviourBuilder.setEventHandler(PasswordChanged.class, (evt, currentBehaviour) ->
-                        currentBehaviour.withState(currentBehaviour.state().withPassword(evt.getPassword()))
+                        currentBehaviour.withState(currentBehaviour.state().withPassword(evt.password()))
         );
 
         behaviourBuilder.setEventHandler(FailedLoginAttemptsIncremented.class, (evt, currentBehaviour) ->

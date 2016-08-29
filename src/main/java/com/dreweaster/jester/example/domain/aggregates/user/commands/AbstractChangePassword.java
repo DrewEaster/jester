@@ -7,5 +7,5 @@ import org.immutables.value.Value;
 @DomainStyle
 public abstract class AbstractChangePassword implements UserCommand {
 
-    abstract String getPassword();
+    abstract String password();
 }
