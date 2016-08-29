@@ -53,6 +53,7 @@ public class ExampleModule extends AbstractModule {
         serialiser.register(UserLocked.class, new UserLockedEventMapper());
 
         // TODO: Does this make sense - thread per connection?
+        // TODO: Number of threads config should drive connection pool size, not other way around
         // TODO: ExecutorService needs to shutdown
         ExecutorService executorService = Executors.newFixedThreadPool(config.getMaximumPoolSize());
 
