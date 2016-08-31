@@ -17,7 +17,7 @@ import java.util.UUID;
  */
 public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements AggregateRepository<A, C, E, State> {
 
-    private Class<A> aggregateType;
+    private AggregateType<A, C, E, State> aggregateType;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandDeduplicatingEventsourcedAggregateRepository.class);
 
@@ -26,7 +26,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
     private CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory;
 
     public CommandDeduplicatingEventsourcedAggregateRepository(
-            Class<A> aggregateType,
+            AggregateType<A, C, E, State> aggregateType,
             EventStore eventStore,
             CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory) {
         this.aggregateType = aggregateType;
@@ -47,9 +47,9 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
     // TODO: Snapshots will have to store last n minutes/hours/days of command ids within their payload.
     private class DeduplicatingCommandHandler {
 
-        private Class<A> aggregateType;
+        private AggregateType<A, C, E, State> aggregateType;
 
-        public DeduplicatingCommandHandler(Class<A> aggregateType) {
+        public DeduplicatingCommandHandler(AggregateType<A, C, E, State> aggregateType) {
             this.aggregateType = aggregateType;
         }
 
@@ -89,13 +89,13 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
 
     private class AggregateRootRef<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> {
 
-        private Class<A> aggregateType;
+        private AggregateType<A, C, E, State> aggregateType;
 
         private AggregateId aggregateId;
 
         private List<E> previousEvents;
 
-        public AggregateRootRef(Class<A> aggregateType, AggregateId aggregateId, List<E> previousEvents) {
+        public AggregateRootRef(AggregateType<A, C, E, State> aggregateType, AggregateId aggregateId, List<E> previousEvents) {
             this.aggregateType = aggregateType;
             this.aggregateId = aggregateId;
             this.previousEvents = previousEvents;
@@ -105,7 +105,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             Promise<List<E>> promise = Promise.make();
 
             try {
-                A aggregateInstance = aggregateType.newInstance();
+                A aggregateInstance = aggregateType.clazz().newInstance();
 
                 // TODO: Pass snapshot once implemented
                 Behaviour<C, E, State> behaviour = aggregateInstance.initialBehaviour();

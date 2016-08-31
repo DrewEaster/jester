@@ -9,7 +9,7 @@ import com.dreweaster.jester.example.application.service.impl.UserServiceImpl;
 import com.dreweaster.jester.example.domain.aggregates.user.events.*;
 import com.dreweaster.jester.example.domain.aggregates.user.repository.UserRepository;
 import com.dreweaster.jester.example.infrastructure.mapper.*;
-import com.dreweaster.jester.infrastructure.driven.eventstore.serialiser.json.JacksonEventPayloadSerialiser;
+import com.dreweaster.jester.infrastructure.driven.eventstore.serialiser.json.JsonEventPayloadSerialiser;
 import com.dreweaster.jester.infrastructure.driven.eventstore.postgres.Postgres95EventStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.AbstractModule;
@@ -45,12 +45,12 @@ public class ExampleModule extends AbstractModule {
 
         // This is so we don't  rely on Jackson Object<=>JSON - we want to keep serialisation/deserialisation completely
         // outside of the domain layer (Hexagonal Architecture FTW).
-        JacksonEventPayloadSerialiser serialiser = new JacksonEventPayloadSerialiser(new ObjectMapper());
-        serialiser.register(UserRegistered.class, new UserRegisteredEventMapper());
-        serialiser.register(UsernameChanged.class, new UsernameChangedEventMapper());
-        serialiser.register(PasswordChanged.class, new PasswordChangedEventMapper());
-        serialiser.register(FailedLoginAttemptsIncremented.class, new FailedLoginAttemptsEventMapper());
-        serialiser.register(UserLocked.class, new UserLockedEventMapper());
+        JsonEventPayloadSerialiser serialiser = new JsonEventPayloadSerialiser(new ObjectMapper());
+        serialiser.registerMapper(UserRegistered.class, new UserRegisteredEventMapper());
+        serialiser.registerMapper(UsernameChanged.class, new UsernameChangedEventMapper());
+        serialiser.registerMapper(PasswordChanged.class, new PasswordChangedEventMapper());
+        serialiser.registerMapper(FailedLoginAttemptsIncremented.class, new FailedLoginAttemptsEventMapper());
+        serialiser.registerMapper(UserLocked.class, new UserLockedEventMapper());
 
         // TODO: Does this make sense - thread per connection?
         // TODO: Number of threads config should drive connection pool size, not other way around

@@ -1,6 +1,7 @@
 package com.dreweaster.jester.example.domain.aggregates.user;
 
 import com.dreweaster.jester.domain.Aggregate;
+import com.dreweaster.jester.domain.AggregateType;
 import com.dreweaster.jester.domain.Behaviour;
 import com.dreweaster.jester.domain.BehaviourBuilder;
 import com.dreweaster.jester.example.domain.aggregates.user.commands.*;
@@ -8,6 +9,9 @@ import com.dreweaster.jester.example.domain.aggregates.user.events.*;
 
 // TODO: Deal with snapshots when implemented
 public class User extends Aggregate<UserCommand, UserEvent, UserState> {
+
+    // NEVER CHANGE THE TYPE NAME (even if class is renamed)!!!
+    public static final AggregateType<User, UserCommand, UserEvent, UserState> TYPE = AggregateType.of("user", User.class);
 
     private static final UserState EMPTY_STATE = UserState.builder()
             .username("")

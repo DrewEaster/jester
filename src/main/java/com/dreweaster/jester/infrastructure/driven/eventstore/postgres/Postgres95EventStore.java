@@ -3,10 +3,7 @@ package com.dreweaster.jester.infrastructure.driven.eventstore.postgres;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
-import com.dreweaster.jester.domain.Aggregate;
-import com.dreweaster.jester.domain.AggregateId;
-import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.domain.DomainEvent;
+import com.dreweaster.jester.domain.*;
 import com.dreweaster.jester.application.eventstore.EventPayloadSerialiser;
 import javaslang.Tuple2;
 import javaslang.collection.List;
@@ -20,6 +17,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 
 /**
+ * TODO: Refactor into separate child maven module
  * TODO: Aggregate types and event types - relying on straight class names is not ideal. Need immunity from refactoring
  * TODO: Need to think about event format evolution over time
  * TODO: Implement integration tests using Postgres started by Docker (via Maven).
@@ -40,13 +38,13 @@ public class Postgres95EventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            Class<A> aggregateType, AggregateId aggregateId) {
+            AggregateType<A, ?, E, ?> aggregateType, AggregateId aggregateId) {
         return Future.of(executorService, () -> loadEventsForAggregateInstance(aggregateType, aggregateId, Option.none()));
     }
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            Class<A> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
+            AggregateType<A, ?, E, ?> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
         return Future.of(executorService, () -> loadEventsForAggregateInstance(
                 aggregateType,
                 aggregateId,
@@ -55,7 +53,7 @@ public class Postgres95EventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Integer batchSize) {
 
         return Future.of(executorService, () -> loadEventsForAggregateType(
@@ -66,7 +64,7 @@ public class Postgres95EventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Long afterOffset,
             Integer batchSize) {
 
@@ -78,7 +76,7 @@ public class Postgres95EventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
             List<E> rawEvents,
@@ -93,7 +91,7 @@ public class Postgres95EventStore implements EventStore {
     }
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> saveEventsForAggregateInstance(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
             List<E> rawEvents,
@@ -103,9 +101,22 @@ public class Postgres95EventStore implements EventStore {
 
         LocalDateTime timestamp = LocalDateTime.now(); // TODO: Inject clock
 
-        List<PersistedEvent<A, E>> persistedEvents = rawEvents.foldLeft(new Tuple2<Long, List<PersistedEvent<A, E>>>(
-                expectedSequenceNumber + 1, List.empty()), (acc, event) -> new Tuple2<>(acc._1 + 1, acc._2.append(
-                new PostgresEvent<>(aggregateId, aggregateType, commandId, event, timestamp, acc._1))))._2;
+        List<PersistedEvent<A, E>> persistedEvents = rawEvents.foldLeft(
+                new Tuple2<Long, List<PersistedEvent<A, E>>>(expectedSequenceNumber + 1, List.empty()), (acc, event) -> {
+
+                    Tuple2<String, Integer> serialisedEvent = serialiser.serialise(event);
+
+                    return new Tuple2<>(acc._1 + 1, acc._2.append(
+                            new PostgresEvent<>(
+                                    aggregateId,
+                                    aggregateType,
+                                    commandId,
+                                    event,
+                                    serialisedEvent._1,
+                                    serialisedEvent._2,
+                                    timestamp,
+                                    acc._1)));
+                })._2;
 
         Long latestSequenceNumber = persistedEvents.last().sequenceNumber();
 
@@ -135,7 +146,7 @@ public class Postgres95EventStore implements EventStore {
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> loadEventsForAggregateInstance(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             Option<Long> afterSequenceNumber) throws SQLException, ClassNotFoundException {
 
@@ -146,7 +157,7 @@ public class Postgres95EventStore implements EventStore {
             ArrayList<PersistedEvent<A, E>> persistedEvents = new ArrayList<>();
 
             while (rs.next()) {
-                persistedEvents.add(resultSetToPersistedEvent(rs));
+                persistedEvents.add(resultSetToPersistedEvent(rs, aggregateType));
             }
 
             return List.ofAll(persistedEvents);
@@ -155,7 +166,7 @@ public class Postgres95EventStore implements EventStore {
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<StreamEvent<A, E>> loadEventsForAggregateType(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Option<Long> afterOffset,
             Integer batchSize) throws SQLException, ClassNotFoundException {
 
@@ -166,7 +177,7 @@ public class Postgres95EventStore implements EventStore {
             ArrayList<StreamEvent<A, E>> persistedEvents = new ArrayList<>();
 
             while (rs.next()) {
-                persistedEvents.add(resultSetToPersistedEvent(rs));
+                persistedEvents.add(resultSetToPersistedEvent(rs, aggregateType));
             }
 
             return List.ofAll(persistedEvents);
@@ -175,23 +186,24 @@ public class Postgres95EventStore implements EventStore {
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> PreparedStatement createSaveEventsBatchedPreparedStatement(
             Connection connection,
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
             List<PersistedEvent<A, E>> events) throws SQLException {
 
         PreparedStatement statement = connection.prepareStatement("" +
-                "INSERT INTO domain_event(aggregate_id, aggregate_type, command_id, event_type, event_payload, event_timestamp, sequence_number) " +
-                "VALUES(?,?,?,?,?,?,?)");
+                "INSERT INTO domain_event(aggregate_id, aggregate_type, command_id, event_type, event_version, event_payload, event_timestamp, sequence_number) " +
+                "VALUES(?,?,?,?,?,?,?,?)");
 
         for (PersistedEvent<A, E> event : events) {
             statement.setString(1, aggregateId.get());
-            statement.setString(2, aggregateType.getName()); // TODO: storing straight class name?
+            statement.setString(2, aggregateType.name());
             statement.setString(3, commandId.get());
-            statement.setString(4, event.rawEvent().getClass().getName()); // TODO: storing straight class name?
-            statement.setString(5, serialiser.serialise(event.rawEvent()));
-            statement.setTimestamp(6, Timestamp.valueOf(event.timestamp()));
-            statement.setLong(7, event.sequenceNumber());
+            statement.setString(4, event.rawEvent().getClass().getName());
+            statement.setInt(5, event.eventVersion());
+            statement.setString(6, ((PostgresEvent<A, E>) event).serialisedEvent()); // TODO: Suspicious casting :-)
+            statement.setTimestamp(7, Timestamp.valueOf(event.timestamp()));
+            statement.setLong(8, event.sequenceNumber());
             statement.addBatch();
         }
 
@@ -200,7 +212,7 @@ public class Postgres95EventStore implements EventStore {
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> PreparedStatement createSaveAggregatePreparedStatement(
             Connection connection,
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             Long newVersion,
             Long expectedPreviousVersion) throws SQLException {
@@ -214,7 +226,7 @@ public class Postgres95EventStore implements EventStore {
                 "DO UPDATE SET aggregate_version = ? WHERE aggregate_root.aggregate_version = ?");
 
         statement.setString(1, aggregateId.get());
-        statement.setString(2, aggregateType.getName()); // TODO: storing straight class name?
+        statement.setString(2, aggregateType.name());
         statement.setLong(3, newVersion);
         statement.setLong(4, newVersion);
         statement.setLong(5, expectedPreviousVersion);
@@ -224,18 +236,18 @@ public class Postgres95EventStore implements EventStore {
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> PreparedStatement createEventsForAggregateInstancePreparedStatement(
             Connection connection,
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             Option<Long> afterSequenceNumber) throws SQLException {
 
         PreparedStatement statement = connection.prepareStatement("" +
-                "SELECT global_offset, aggregate_id, aggregate_type, command_id, event_type, event_payload, event_timestamp, sequence_number " +
+                "SELECT global_offset, aggregate_id, aggregate_type, command_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
                 "FROM domain_event " +
                 "WHERE aggregate_id = ? AND aggregate_type = ? AND sequence_number > ? " +
                 "ORDER BY sequence_number");
 
         statement.setString(1, aggregateId.get());
-        statement.setString(2, aggregateType.getName()); // TODO: storing straight class name?
+        statement.setString(2, aggregateType.name());
         statement.setLong(3, afterSequenceNumber.getOrElse(-1L));
 
         return statement;
@@ -243,18 +255,18 @@ public class Postgres95EventStore implements EventStore {
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> PreparedStatement createEventsForAggregateTypePreparedStatement(
             Connection connection,
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Option<Long> afterOffset,
             Integer batchSize) throws SQLException {
 
         PreparedStatement statement = connection.prepareStatement("" +
-                "SELECT global_offset, aggregate_id, aggregate_type, command_id, event_type, event_payload, event_timestamp, sequence_number " +
+                "SELECT global_offset, aggregate_id, aggregate_type, command_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
                 "FROM domain_event " +
                 "WHERE aggregate_type = ? AND global_offset > ? " +
                 "ORDER BY global_offset " +
                 "LIMIT ?");
 
-        statement.setString(1, aggregateType.getName()); // TODO: storing straight class name?
+        statement.setString(1, aggregateType.name());
         statement.setLong(2, afterOffset.getOrElse(-1L));
         statement.setInt(3, batchSize);
 
@@ -262,22 +274,27 @@ public class Postgres95EventStore implements EventStore {
     }
 
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> StreamEvent<A, E> resultSetToPersistedEvent(ResultSet rs)
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> StreamEvent<A, E> resultSetToPersistedEvent(
+            ResultSet rs,
+            AggregateType<A, ?, E, ?> aggregateType)
             throws SQLException, ClassNotFoundException {
         Long offset = rs.getLong(1);
         AggregateId aggregateId = AggregateId.of(rs.getString(2));
-        Class<A> aggregateType = (Class<A>) Class.forName(rs.getString(3));
         CommandId commandId = CommandId.of(rs.getString(4));
-        Class<E> eventType = (Class<E>) Class.forName(rs.getString(5));
-        E rawEvent = serialiser.deserialise(rs.getString(6), eventType);
-        LocalDateTime timestamp = rs.getTimestamp(7).toLocalDateTime();
-        Long sequenceNumber = rs.getLong(8);
+        String eventType = rs.getString(5);
+        Integer eventVersion = rs.getInt(6);
+        String serialisedEvent = rs.getString(7);
+        E rawEvent = serialiser.deserialise(serialisedEvent, eventType, eventVersion);
+        LocalDateTime timestamp = rs.getTimestamp(8).toLocalDateTime();
+        Long sequenceNumber = rs.getLong(9);
         return new PostgresStreamEvent<>(
                 offset,
                 aggregateId,
                 aggregateType,
                 commandId,
                 rawEvent,
+                serialisedEvent,
+                eventVersion,
                 timestamp,
                 sequenceNumber);
     }
@@ -289,12 +306,14 @@ public class Postgres95EventStore implements EventStore {
         public PostgresStreamEvent(
                 Long offset,
                 AggregateId aggregateId,
-                Class<A> aggregateType,
+                AggregateType<A, ?, E, ?> aggregateType,
                 CommandId commandId,
                 E rawEvent,
+                String serialisedEvent,
+                Integer eventVersion,
                 LocalDateTime timestamp,
                 Long sequenceNumber) {
-            super(aggregateId, aggregateType, commandId, rawEvent, timestamp, sequenceNumber);
+            super(aggregateId, aggregateType, commandId, rawEvent, serialisedEvent, eventVersion, timestamp, sequenceNumber);
             this.offset = offset;
         }
 
@@ -309,11 +328,15 @@ public class Postgres95EventStore implements EventStore {
 
         private AggregateId aggregateId;
 
-        private Class<A> aggregateType;
+        private AggregateType<A, ?, E, ?> aggregateType;
 
         private CommandId commandId;
 
         private E rawEvent;
+
+        private String serialisedEvent;
+
+        private Integer eventVersion;
 
         private LocalDateTime timestamp = LocalDateTime.now();
 
@@ -321,9 +344,11 @@ public class Postgres95EventStore implements EventStore {
 
         public PostgresEvent(
                 AggregateId aggregateId,
-                Class<A> aggregateType,
+                AggregateType<A, ?, E, ?> aggregateType,
                 CommandId commandId,
                 E rawEvent,
+                String serialisedEvent,
+                Integer eventVersion,
                 LocalDateTime timestamp,
                 Long sequenceNumber) {
 
@@ -331,6 +356,8 @@ public class Postgres95EventStore implements EventStore {
             this.aggregateType = aggregateType;
             this.commandId = commandId;
             this.rawEvent = rawEvent;
+            this.serialisedEvent = serialisedEvent;
+            this.eventVersion = eventVersion;
             this.timestamp = timestamp;
             this.sequenceNumber = sequenceNumber;
         }
@@ -341,7 +368,7 @@ public class Postgres95EventStore implements EventStore {
         }
 
         @Override
-        public Class<A> aggregateType() {
+        public AggregateType<A, ?, E, ?> aggregateType() {
             return aggregateType;
         }
 
@@ -361,6 +388,15 @@ public class Postgres95EventStore implements EventStore {
             return rawEvent;
         }
 
+        public String serialisedEvent() {
+            return serialisedEvent;
+        }
+
+        @Override
+        public Integer eventVersion() {
+            return eventVersion;
+        }
+
         @Override
         public LocalDateTime timestamp() {
             return timestamp;
@@ -378,6 +414,7 @@ public class Postgres95EventStore implements EventStore {
                     ", aggregateType=" + aggregateType +
                     ", commandId=" + commandId +
                     ", rawEvent=" + rawEvent +
+                    ", eventVersion=" + eventVersion +
                     ", timestamp=" + timestamp +
                     ", sequenceNumber=" + sequenceNumber +
                     '}';

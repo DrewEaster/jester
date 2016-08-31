@@ -6,6 +6,7 @@ import com.dreweaster.jester.example.application.CommandEnvelope;
 import com.dreweaster.jester.example.application.service.UserService;
 import com.dreweaster.jester.example.domain.aggregates.user.commands.RegisterUser;
 import com.dreweaster.jester.example.infrastructure.ExampleModule;
+import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import javaslang.concurrent.Future;
@@ -14,8 +15,11 @@ import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+// TODO: Refactor into separate child maven module
 public class ExampleApplication {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ExampleApplication.class);
@@ -41,17 +45,29 @@ public class ExampleApplication {
 
         UserService userService = injector.getInstance(UserService.class);
 
-        // Register user for first time
-        userService.createUser(CommandEnvelope.of(
-                        AggregateId.of("deterministic-aggregate-id-1"),
-                        CommandId.of("deterministic-command-id-1"),
-                        RegisterUser.builder()
-                                .username("user1")
-                                .password("password1")
-                                .create())
-        ).onComplete(new ResponseHandler()).await();
+        RateLimiter rateLimiter = RateLimiter.create(1000);
 
-        // Send same command with different command id
+        ReportingResponseHandler responseHandler = new ReportingResponseHandler();
+
+        int count = 10000;
+        for (int i = 0; i < count; i++) {
+            rateLimiter.acquire();
+            // Register user for first time
+            userService.createUser(CommandEnvelope.of(
+                            AggregateId.of("deterministic-aggregate-id-" + i),
+                            CommandId.of("deterministic-command-id-" + i),
+                            RegisterUser.builder()
+                                    .username("user" + i)
+                                    .password("password")
+                                    .create())
+            ).onComplete(responseHandler);
+        }
+        //long executionTime = System.currentTimeMillis() - startTime;
+        //long executionTimeSeconds = executionTime / 1000;
+        //LOGGER.info("Executed in " + executionTime + "ms (" + (count / executionTimeSeconds) + "tps)");
+
+
+        /*// Send same command with different command id
         userService.createUser(CommandEnvelope.of(
                         AggregateId.of("deterministic-aggregate-id-1"),
                         CommandId.of("deterministic-command-id-2"),
@@ -69,7 +85,34 @@ public class ExampleApplication {
                                 .username("user1")
                                 .password("password1")
                                 .create())
-        ).onComplete(new ResponseHandler()).await();
+        ).onComplete(new ResponseHandler()).await();*/
+    }
+
+    private class ReportingResponseHandler implements Consumer<Try<AggregateId>> {
+
+        private long startTime = System.currentTimeMillis();
+
+        private AtomicInteger count = new AtomicInteger();
+
+        public ReportingResponseHandler() {
+
+            ScheduledExecutorService executor = new ScheduledThreadPoolExecutor(1);
+
+            Runnable reporterTask = () -> {
+                long executionTimeInSeconds = (System.currentTimeMillis() - startTime) / 1000;
+                long tps = count.get() / executionTimeInSeconds;
+                LOGGER.info(tps + "tps");
+            };
+
+            executor.scheduleAtFixedRate(reporterTask, 1000, 1000, TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public void accept(Try<AggregateId> aggregateIds) {
+            aggregateIds
+                    .onSuccess(aggregateId -> LOGGER.info("count = " + count.incrementAndGet()))
+                    .onFailure(throwable -> LOGGER.error("ERROR!", throwable));
+        }
     }
 
     private class ResponseHandler implements Consumer<Try<AggregateId>> {

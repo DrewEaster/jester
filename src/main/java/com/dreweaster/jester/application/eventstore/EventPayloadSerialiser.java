@@ -1,6 +1,7 @@
 package com.dreweaster.jester.application.eventstore;
 
 import com.dreweaster.jester.domain.DomainEvent;
+import javaslang.Tuple2;
 
 public interface EventPayloadSerialiser {
 
@@ -14,7 +15,10 @@ public interface EventPayloadSerialiser {
         }
     }
 
-    <T extends DomainEvent> T deserialise(String payload, Class<T> eventType);
+    <T extends DomainEvent> T deserialise(
+            String serialisedPayload,
+            String serialisedEventType,
+            Integer serialisedEventVersion);
 
-    <T extends DomainEvent> String serialise(T event);
+    <T extends DomainEvent> Tuple2<String, Integer> serialise(T event);
 }
