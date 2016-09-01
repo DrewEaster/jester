@@ -1,6 +1,6 @@
-package com.dreweaster.jester.infrastructure.driven.eventstore.serialiser.json;
+package com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json;
 
-import com.dreweaster.jester.application.eventstore.EventPayloadSerialiser;
+import com.dreweaster.jester.application.eventstore.EventPayloadMapper;
 import com.dreweaster.jester.domain.DomainEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,8 +12,11 @@ import javaslang.collection.HashMap;
 import javaslang.collection.List;
 import javaslang.collection.Map;
 
+import java.io.IOException;
+import java.util.function.Function;
+
 // TODO: Refactor into separate child maven module
-public class JsonEventPayloadSerialiser implements EventPayloadSerialiser {
+public class JsonEventPayloadMapper implements EventPayloadMapper {
 
     private ObjectMapper objectMapper;
 
@@ -21,18 +24,30 @@ public class JsonEventPayloadSerialiser implements EventPayloadSerialiser {
 
     private Map<String, Function1<DomainEvent, Tuple2<String, Integer>>> serialisers = HashMap.empty();
 
-    public JsonEventPayloadSerialiser(ObjectMapper objectMapper, List<JsonEventMapper<?>> mappers) {
+    public JsonEventPayloadMapper(ObjectMapper objectMapper, List<JsonEventMappingConfigurer<?>> mappers) {
         this.objectMapper = objectMapper;
         init(mappers);
     }
 
     @SuppressWarnings("unchecked")
-    private void init(List<JsonEventMapper<?>> mappers) {
-        deserialisers = mappers.foldLeft(deserialisers, (acc, mapper) -> {
+    private void init(List<JsonEventMappingConfigurer<?>> configurers) {
+
+        // TODO: Validate no clashes between registered mappers
+        // e.g. what if two mappers try to convert to the same event class?
+        // e.g. what if a migration in one mapper maps to a class name in another mapper?
+        // Such scenarios should be made impossible (at least for v1...)
+
+        List<MappingConfiguration> mappingConfigurations = configurers.map(configurer -> {
             MappingConfiguration mappingConfiguration = new MappingConfiguration();
-            mapper.configure(mappingConfiguration);
-            return acc.merge(mappingConfiguration.createDeserialisers());
+            configurer.configure(mappingConfiguration);
+            return mappingConfiguration;
         });
+
+        deserialisers = mappingConfigurations.foldLeft(deserialisers, (acc, mappingConfiguration) ->
+                acc.merge(mappingConfiguration.createDeserialisers()));
+
+        serialisers = mappingConfigurations.foldLeft(serialisers, (acc, mappingConfiguration) ->
+                acc.put(mappingConfiguration.createSerialiser()));
     }
 
     private class MappingConfiguration<T extends DomainEvent> implements JsonEventMappingConfigurationFactory<T>, JsonEventMappingConfiguration<T> {
@@ -63,20 +78,82 @@ public class JsonEventPayloadSerialiser implements EventPayloadSerialiser {
 
         @Override
         public JsonEventMappingConfiguration<T> migrateClassName(String className) {
-            migrations = migrations.append(new ClassNameMigration(className, currentVersion, currentVersion + 1));
-            currentClassName = className;
-            currentVersion = currentVersion + 1;
+            Migration migration = new ClassNameMigration(currentClassName, className, currentVersion, currentVersion + 1);
+            migrations = migrations.append(migration);
+            currentClassName = migration.toClassName();
+            currentVersion = migration.toVersion();
             return this;
         }
 
         @Override
-        public void mapper(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction) {
+        public void objectMappers(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction) {
             this.serialiseFunction = serialiseFunction;
             this.deserialiseFunction = deserialiseFunction;
         }
 
         private Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> createDeserialisers() {
-            return null;
+            Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> deserialisers = HashMap.empty();
+
+            if (!migrations.isEmpty()) {
+                deserialisers = putDeserialisers(migrations, deserialisers);
+            }
+
+            // Include the 'current' version deserialiser
+            deserialisers = deserialisers.put(new Tuple2<>(currentClassName, currentVersion), serialisedEvent -> {
+                JsonNode root = stringToJsonNode(serialisedEvent);
+                return deserialiseFunction.apply(root);
+            });
+            return deserialisers;
+        }
+
+        @SuppressWarnings("unchecked")
+        private Tuple2<String, Function1<DomainEvent, Tuple2<String, Integer>>> createSerialiser() {
+            return new Tuple2<>(currentClassName, domainEvent -> {
+                ObjectNode root = objectMapper.createObjectNode();
+                JsonNode serialisedJsonEvent = serialiseFunction.apply((T) domainEvent, root);
+                return new Tuple2<>(serialisedJsonEvent.toString(), currentVersion);
+            });
+        }
+
+        private Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> putDeserialisers(
+                List<Migration> migrations,
+                Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> deserialisers) {
+
+            if (migrations.isEmpty()) {
+                return deserialisers;
+            } else {
+                return putDeserialisers(migrations.tail(), putDeserialiser(migrations, deserialisers));
+            }
+        }
+
+        private Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> putDeserialiser(
+                List<Migration> migrations,
+                Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> deserialisers) {
+
+            Migration migration = migrations.head();
+            String className = migration.fromClassName();
+            Integer version = migration.fromVersion();
+            List<Function<JsonNode, JsonNode>> migrationFunctions = migrations.map(Migration::migrationFunction);
+            Function<JsonNode, JsonNode> combinedMigrationFunction = migrationFunctions
+                    .tail()
+                    .foldLeft(migrationFunctions.head(), (combined, f) -> f.compose(combined));
+
+            Function1<String, DomainEvent> deserialiser = serialisedEvent -> {
+                JsonNode root = stringToJsonNode(serialisedEvent);
+                JsonNode migratedRoot = combinedMigrationFunction.apply(root);
+                return deserialiseFunction.apply(migratedRoot);
+            };
+
+            return deserialisers.put(new Tuple2<>(className, version), deserialiser);
+        }
+
+        private JsonNode stringToJsonNode(String serialisedEvent) {
+            try {
+                return objectMapper.readTree(serialisedEvent);
+            } catch (IOException ex) {
+                // TODO: Is there some other way this should be handling errors?
+                throw new MappingException("Could not parse serialised event payload into JSON", ex);
+            }
         }
     }
 
@@ -112,7 +189,9 @@ public class JsonEventPayloadSerialiser implements EventPayloadSerialiser {
 
     private interface Migration {
 
-        String className();
+        String fromClassName();
+
+        String toClassName();
 
         Integer fromVersion();
 
@@ -144,7 +223,12 @@ public class JsonEventPayloadSerialiser implements EventPayloadSerialiser {
         }
 
         @Override
-        public String className() {
+        public String fromClassName() {
+            return className;
+        }
+
+        @Override
+        public String toClassName() {
             return className;
         }
 
@@ -165,25 +249,35 @@ public class JsonEventPayloadSerialiser implements EventPayloadSerialiser {
     }
 
     private class ClassNameMigration implements Migration {
-        private String className;
+
+        private String fromClassName;
+
+        private String toClassName;
 
         private Integer fromVersion;
 
         private Integer toVersion;
 
         public ClassNameMigration(
-                String className,
+                String fromClassName,
+                String toClassName,
                 Integer fromVersion,
                 Integer toVersion) {
 
-            this.className = className;
+            this.fromClassName = fromClassName;
+            this.toClassName = toClassName;
             this.fromVersion = fromVersion;
             this.toVersion = toVersion;
         }
 
         @Override
-        public String className() {
-            return className;
+        public String fromClassName() {
+            return fromClassName;
+        }
+
+        @Override
+        public String toClassName() {
+            return toClassName;
         }
 
         @Override

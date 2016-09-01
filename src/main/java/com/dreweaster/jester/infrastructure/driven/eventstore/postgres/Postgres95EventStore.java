@@ -4,7 +4,7 @@ import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
 import com.dreweaster.jester.domain.*;
-import com.dreweaster.jester.application.eventstore.EventPayloadSerialiser;
+import com.dreweaster.jester.application.eventstore.EventPayloadMapper;
 import javaslang.Tuple2;
 import javaslang.collection.List;
 import javaslang.concurrent.Future;
@@ -28,9 +28,9 @@ public class Postgres95EventStore implements EventStore {
 
     private ExecutorService executorService;
 
-    private EventPayloadSerialiser serialiser;
+    private EventPayloadMapper serialiser;
 
-    public Postgres95EventStore(DataSource dataSource, ExecutorService executorService, EventPayloadSerialiser serialiser) {
+    public Postgres95EventStore(DataSource dataSource, ExecutorService executorService, EventPayloadMapper serialiser) {
         this.dataSource = dataSource;
         this.executorService = executorService;
         this.serialiser = serialiser;

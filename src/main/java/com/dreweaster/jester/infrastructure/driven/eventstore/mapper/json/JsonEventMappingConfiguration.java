@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.driven.eventstore.serialiser.json;
+package com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json;
 
 import com.dreweaster.jester.domain.DomainEvent;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,5 +12,5 @@ public interface JsonEventMappingConfiguration<T extends DomainEvent> {
 
     JsonEventMappingConfiguration<T> migrateClassName(String className);
 
-    void mapper(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction);
+    void objectMappers(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction);
 }

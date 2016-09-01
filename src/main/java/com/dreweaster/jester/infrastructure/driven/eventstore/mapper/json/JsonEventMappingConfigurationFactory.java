@@ -1,4 +1,4 @@
-package com.dreweaster.jester.infrastructure.driven.eventstore.serialiser.json;
+package com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json;
 
 import com.dreweaster.jester.domain.DomainEvent;
 

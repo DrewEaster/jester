@@ -1,9 +1,6 @@
 package com.dreweaster.jester.infrastructure.driven.eventstore.memory;
 
-import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.domain.Aggregate;
-import com.dreweaster.jester.domain.AggregateId;
-import com.dreweaster.jester.domain.DomainEvent;
+import com.dreweaster.jester.domain.*;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
@@ -16,14 +13,14 @@ import javaslang.concurrent.Future;
 import java.time.LocalDateTime;
 
 
-// TODO: Delegate serialisation to an EventPayloadSerialiser
+// TODO: Delegate serialisation to an EventPayloadMapper
 public class InMemoryEventStore implements EventStore {
 
-    private Map<Class, List> eventStorage = HashMap.empty();
+    private Map<AggregateType, List> eventStorage = HashMap.empty();
 
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId) {
 
         return Future.successful(persistedEventsFor(aggregateType, aggregateId));
@@ -31,7 +28,7 @@ public class InMemoryEventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            Class<A> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
+            AggregateType<A, ?, E, ?> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
 
         return Future.successful(persistedEventsFor(aggregateType, aggregateId)
                 .filter(event -> event.sequenceNumber() > afterSequenceNumber));
@@ -39,7 +36,7 @@ public class InMemoryEventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Integer batchSize) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
         return Future.successful(persistedEvents
@@ -49,7 +46,7 @@ public class InMemoryEventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Long afterOffset,
             Integer batchSize) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
@@ -62,7 +59,7 @@ public class InMemoryEventStore implements EventStore {
     @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
             List<E> rawEvents,
@@ -93,13 +90,13 @@ public class InMemoryEventStore implements EventStore {
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
-            Class<A> aggregateType) {
+            AggregateType<A, ?, E, ?> aggregateType) {
         return eventStorage.get(aggregateType).getOrElse(List.empty());
     }
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId) {
 
         return eventStorage.get(aggregateType)
@@ -109,7 +106,7 @@ public class InMemoryEventStore implements EventStore {
     }
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             Long expectedSequenceNumber) {
 
@@ -141,7 +138,7 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public Class<A> aggregateType() {
+        public AggregateType<A, ?, E, ?> aggregateType() {
             return persistedEvent.aggregateType();
         }
 
@@ -166,6 +163,11 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
+        public Integer eventVersion() {
+            return 1; // TODO: Implement EventPayloadMapper integration
+        }
+
+        @Override
         public LocalDateTime timestamp() {
             return persistedEvent.timestamp();
         }
@@ -180,7 +182,7 @@ public class InMemoryEventStore implements EventStore {
 
         private AggregateId aggregateId;
 
-        private Class<A> aggregateType;
+        private AggregateType<A, ?, E, ?> aggregateType;
 
         private CommandId commandId;
 
@@ -191,7 +193,7 @@ public class InMemoryEventStore implements EventStore {
         private Long sequenceNumber;
 
         public SimplePersistedEvent(
-                Class<A> aggregateType,
+                AggregateType<A, ?, E, ?> aggregateType,
                 AggregateId aggregateId,
                 CommandId commandId,
                 E rawEvent,
@@ -209,7 +211,7 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public Class<A> aggregateType() {
+        public AggregateType<A, ?, E, ?> aggregateType() {
             return aggregateType;
         }
 
@@ -227,6 +229,11 @@ public class InMemoryEventStore implements EventStore {
         @Override
         public E rawEvent() {
             return rawEvent;
+        }
+
+        @Override
+        public Integer eventVersion() {
+            return 1; // TODO: Implement EventPayloadMapper integration
         }
 
         @Override

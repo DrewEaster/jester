@@ -3,10 +3,7 @@ package com.dreweaster.jester.infrastructure;
 import com.dreweaster.jester.application.eventstore.EventStore;
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.jester.application.eventstore.StreamEvent;
-import com.dreweaster.jester.domain.Aggregate;
-import com.dreweaster.jester.domain.AggregateId;
-import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.domain.DomainEvent;
+import com.dreweaster.jester.domain.*;
 import javaslang.Tuple2;
 import javaslang.collection.HashMap;
 import javaslang.collection.List;
@@ -19,7 +16,7 @@ import java.time.LocalDateTime;
 
 public class MockEventStore implements EventStore {
 
-    private Map<Class, List> eventStorage = HashMap.empty();
+    private Map<AggregateType, List> eventStorage = HashMap.empty();
 
     private boolean loadErrorState = false;
 
@@ -47,7 +44,7 @@ public class MockEventStore implements EventStore {
 
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId) {
 
         if (loadErrorState) {
@@ -60,13 +57,13 @@ public class MockEventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            Class<A> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
+            AggregateType<A, ?, E, ?> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
         return loadEvents(aggregateType, aggregateId);
     }
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Integer batchSize) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
         return Future.successful(persistedEvents
@@ -76,7 +73,7 @@ public class MockEventStore implements EventStore {
 
     @Override
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             Long afterOffset,
             Integer batchSize) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
@@ -89,7 +86,7 @@ public class MockEventStore implements EventStore {
     @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             CommandId commandId,
             List<E> rawEvents,
@@ -124,13 +121,13 @@ public class MockEventStore implements EventStore {
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
-            Class<A> aggregateType) {
+            AggregateType<A, ?, E, ?> aggregateType) {
         return eventStorage.get(aggregateType).getOrElse(List.empty());
     }
 
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId) {
 
         return eventStorage.get(aggregateType)
@@ -140,7 +137,7 @@ public class MockEventStore implements EventStore {
     }
 
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
-            Class<A> aggregateType,
+            AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
             Long expectedSequenceNumber) {
 
@@ -172,7 +169,7 @@ public class MockEventStore implements EventStore {
         }
 
         @Override
-        public Class<A> aggregateType() {
+        public AggregateType<A, ?, E, ?> aggregateType() {
             return persistedEvent.aggregateType();
         }
 
@@ -197,6 +194,11 @@ public class MockEventStore implements EventStore {
         }
 
         @Override
+        public Integer eventVersion() {
+            return 1; // TODO: Integrate event versioning?
+        }
+
+        @Override
         public LocalDateTime timestamp() {
             return persistedEvent.timestamp();
         }
@@ -212,7 +214,7 @@ public class MockEventStore implements EventStore {
 
         private AggregateId aggregateId;
 
-        private Class<A> aggregateType;
+        private AggregateType<A, ?, E, ?> aggregateType;
 
         private CommandId commandId;
 
@@ -223,7 +225,7 @@ public class MockEventStore implements EventStore {
         private Long sequenceNumber;
 
         public MockPersistedEvent(
-                Class<A> aggregateType,
+                AggregateType<A, ?, E, ?> aggregateType,
                 AggregateId aggregateId,
                 CommandId commandId,
                 E rawEvent,
@@ -241,7 +243,7 @@ public class MockEventStore implements EventStore {
         }
 
         @Override
-        public Class<A> aggregateType() {
+        public AggregateType<A, ?, E, ?> aggregateType() {
             return aggregateType;
         }
 
@@ -259,6 +261,11 @@ public class MockEventStore implements EventStore {
         @Override
         public E rawEvent() {
             return rawEvent;
+        }
+
+        @Override
+        public Integer eventVersion() {
+            return 1; // TODO: Integrate event versioning?
         }
 
         @Override

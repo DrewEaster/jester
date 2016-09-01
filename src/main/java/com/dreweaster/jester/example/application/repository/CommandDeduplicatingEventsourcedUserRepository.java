@@ -19,6 +19,6 @@ public class CommandDeduplicatingEventsourcedUserRepository
     public CommandDeduplicatingEventsourcedUserRepository(
             EventStore eventStore,
             CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory) {
-        super(User.class, eventStore, commandDeduplicationStrategyFactory);
+        super(User.TYPE, eventStore, commandDeduplicationStrategyFactory);
     }
 }

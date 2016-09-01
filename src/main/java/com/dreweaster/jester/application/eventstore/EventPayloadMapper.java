@@ -3,7 +3,7 @@ package com.dreweaster.jester.application.eventstore;
 import com.dreweaster.jester.domain.DomainEvent;
 import javaslang.Tuple2;
 
-public interface EventPayloadSerialiser {
+public interface EventPayloadMapper {
 
     class MappingException extends RuntimeException {
         public MappingException(String message) {
@@ -12,6 +12,10 @@ public interface EventPayloadSerialiser {
 
         public MappingException(Throwable cause) {
             super(cause);
+        }
+
+        public MappingException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
