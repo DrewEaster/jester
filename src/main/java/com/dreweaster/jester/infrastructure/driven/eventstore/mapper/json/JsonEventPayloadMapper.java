@@ -18,6 +18,29 @@ import java.util.function.Function;
 // TODO: Refactor into separate child maven module
 public class JsonEventPayloadMapper implements EventPayloadMapper {
 
+    public static class UnparseableJsonPayloadException extends MappingException {
+
+        public UnparseableJsonPayloadException(Throwable cause, String serialisedPayload) {
+            super("Could not parse JSON event payload: " + serialisedPayload, cause);
+        }
+    }
+
+    public static class MissingDeserialiserException extends MappingException {
+
+        public MissingDeserialiserException(String serialisedEventType, Integer serialisedEventVersion) {
+            super(String.format(
+                    "No deserialiser found for event_type = '%s' with event_version = '%d'",
+                    serialisedEventType,
+                    serialisedEventVersion));
+        }
+    }
+
+    public static class MissingSerialiserException extends MappingException {
+        public MissingSerialiserException(String eventType) {
+            super(String.format("No serialiser found for event_type = '%s'", eventType));
+        }
+    }
+
     private ObjectMapper objectMapper;
 
     private Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> deserialisers = HashMap.empty();
@@ -151,8 +174,7 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
             try {
                 return objectMapper.readTree(serialisedEvent);
             } catch (IOException ex) {
-                // TODO: Is there some other way this should be handling errors?
-                throw new MappingException("Could not parse serialised event payload into JSON", ex);
+                throw new UnparseableJsonPayloadException(ex, serialisedEvent);
             }
         }
     }
@@ -166,10 +188,9 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         Function1<String, DomainEvent> deserialiser = deserialisers
                 .get(new Tuple2<>(serialisedEventType, serialisedEventVersion))
-                .getOrElseThrow(() -> new MappingException(String.format(
-                        "No deserialiser found for event_type = '%s' with event_version = '%d'",
+                .getOrElseThrow(() -> new MissingDeserialiserException(
                         serialisedEventType,
-                        serialisedEventVersion)));
+                        serialisedEventVersion));
 
         return (T) deserialiser.apply(serialisedPayload);
     }
@@ -180,9 +201,7 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         Function1<DomainEvent, Tuple2<String, Integer>> serialiser = serialisers
                 .get(event.getClass().getName())
-                .getOrElseThrow(() -> new MappingException(String.format(
-                        "No serialiser found for event_type = '%s'"
-                        , event.getClass().getName())));
+                .getOrElseThrow(() -> new MissingSerialiserException(event.getClass().getName()));
 
         return serialiser.apply(event);
     }
