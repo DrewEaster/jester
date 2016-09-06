@@ -4,6 +4,7 @@ CREATE TABLE domain_event (
   aggregate_type  VARCHAR(100) NOT NULL,
   command_id      VARCHAR(36)  NOT NULL,
   event_type      VARCHAR(100) NOT NULL,
+  event_version   INT          NOT NULL,
   event_payload   TEXT         NOT NULL,
   event_timestamp TIMESTAMP    NOT NULL,
   sequence_number BIGINT       NOT NULL

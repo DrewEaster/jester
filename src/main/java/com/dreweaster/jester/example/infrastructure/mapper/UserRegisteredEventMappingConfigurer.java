@@ -39,56 +39,7 @@ public class UserRegisteredEventMappingConfigurer implements JsonEventMappingCon
                 .migrateClassName(UserRegistered.class.getName())
                 .migrateFormat(this::migrateVersion6ToVersion8)
                 .mappingFunctions(this::serialise, this::deserialise);
-
-        /*(com.dreweaster.domain.UserInstantiated, 1)
-                -> mapVersion1ToVersion2()
-                -> mapVersion2ToVersion3()
-                -> mapVersion3ToVersion4()
-                -> mapVersion4ToVersion6()
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-        (com.dreweaster.domain.UserInstantiated, 2)
-                -> mapVersion2ToVersion3()
-                -> mapVersion3ToVersion4()
-                -> mapVersion4ToVersion6()
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-         (com.dreweaster.domain.UserInstantiated, 3)
-                -> mapVersion3ToVersion4()
-                -> mapVersion4ToVersion6()
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-         (com.dreweaster.domain.UserInstantiated, 4)
-                -> mapVersion4ToVersion6()
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-          (com.dreweaster.domain.UserCreated, 5)
-                -> mapVersion4ToVersion6()
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-        (com.dreweaster.domain.UserCreated, 6) ->
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-        (com.dreweaster.domain.UserRegistered, 7) ->
-                -> mapVersion6ToVersion8()
-                -> deserialise()
-
-        (com.dreweaster.domain.UserRegistered, 8) ->
-                -> deserialise()*/
     }
-
-/*    @Override
-    public void configure(JsonEventMappingConfigurationFactory<UserRegistered> configurationFactory) {
-        configurationFactory
-                .create(UserRegistered.class.getName())
-                .mappingFunctions(this::serialise, this::deserialise);
-    }*/
 
     private JsonNode serialise(UserRegistered event, ObjectNode root) {
         root.put("username", event.username());
