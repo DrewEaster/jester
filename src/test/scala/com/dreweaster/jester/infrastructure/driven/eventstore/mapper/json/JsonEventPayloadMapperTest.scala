@@ -1,7 +1,8 @@
 package com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json
 
 import com.dreweaster.jester.domain.DomainEvent
-import com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.JsonEventPayloadMapper.MissingDeserialiserException
+import com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.JsonEventPayloadMapper.InvalidMappingConfigurationException.ConfigurationError._
+import com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.JsonEventPayloadMapper.{InvalidMappingConfigurationException, MissingDeserialiserException}
 import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import org.scalatest.{Matchers, GivenWhenThen, FeatureSpec}
@@ -274,13 +275,123 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
   }
 
   feature("A JsonEventPayloadMapper rejects competing mapping configurers") {
-
+    // TODO: Complete scenarios for this feature
   }
 
-  feature("A JsonEventPayloadMapper rejects insufficiently configured mapping configurers") {
+  feature("A JsonEventPayloadMapper rejects incorrectly configured mapping configurers") {
 
+    scenario("Rejects a null serialise function") {
+      Given("a configurer declaring a null serialise function")
+      val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
+        override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
+          configurationFactory.create("dummy").mappingFunctions(null, new javaslang.Function1[JsonNode, DummyEvent] {
+            override def apply(t1: JsonNode): DummyEvent = new DummyEvent()
+          })
+        }
+      }
+
+      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+
+      When("creating a JsonEventPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+
+      Then("the null serialise function should be rejected")
+      thrown.configurationError() should be(SERIALISE_FUNCTION)
+    }
+
+    scenario("Rejects a null deserialise function") {
+      Given("a configurer declaring a null deserialise function")
+      val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
+        override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
+          configurationFactory.create("dummy").mappingFunctions(new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
+            override def apply(t1: DummyEvent, t2: ObjectNode): JsonNode = t2
+          }, null)
+        }
+      }
+
+      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+
+      When("creating a JsonEventPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+
+      Then("the null deserialise function should be rejected")
+      thrown.configurationError() should be(DESERIALISE_FUNCTION)
+    }
+
+    scenario("Rejects a null initial class name") {
+      Given("a configurer declaring a null initial class name")
+      val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
+        override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
+          configurationFactory.create(null)
+        }
+      }
+
+      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+
+      When("creating a JsonEventPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+
+      Then("the null initial class name should be rejected")
+      thrown.configurationError() should be(INITIAL_CLASS_NAME)
+    }
+
+    scenario("Rejects a null migration function") {
+      Given("a configurer declaring a null migration function")
+      val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
+        override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
+          configurationFactory
+            .create("dummy")
+            .migrateFormat(null)
+            .mappingFunctions(
+              new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
+                override def apply(t1: DummyEvent, t2: ObjectNode): JsonNode = t2
+              },
+              new javaslang.Function1[JsonNode, DummyEvent] {
+                override def apply(t1: JsonNode): DummyEvent = new DummyEvent()
+              }
+            )
+        }
+      }
+
+      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+
+      When("creating a JsonEventPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+
+      Then("the null null migration function should be rejected")
+      thrown.configurationError() should be(MIGRATION_FUNCTION)
+    }
+
+    scenario("Rejects a null migration class name") {
+      Given("a configurer declaring a null migration class name")
+      val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
+        override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
+          configurationFactory
+            .create("dummy")
+            .migrateClassName(null)
+            .mappingFunctions(
+              new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
+                override def apply(t1: DummyEvent, t2: ObjectNode): JsonNode = t2
+              },
+              new javaslang.Function1[JsonNode, DummyEvent] {
+                override def apply(t1: JsonNode): DummyEvent = new DummyEvent()
+              }
+            )
+        }
+      }
+
+      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+
+      When("creating a JsonEventPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+
+      Then("the null null migration class name should be rejected")
+      thrown.configurationError() should be(MIGRATION_CLASS_NAME)
+    }
   }
 }
+
+class DummyEvent(data: String = "") extends DomainEvent
 
 class EventWithComplexMigrationHistoryClassName3(val forename: String, val surname: String, val active: Boolean) extends DomainEvent
 

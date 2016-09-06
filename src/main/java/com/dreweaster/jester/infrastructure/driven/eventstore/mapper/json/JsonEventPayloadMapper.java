@@ -18,6 +18,28 @@ import java.util.function.Function;
 // TODO: Refactor into separate child maven module
 public class JsonEventPayloadMapper implements EventPayloadMapper {
 
+    public static class InvalidMappingConfigurationException extends MappingException {
+
+        public enum ConfigurationError {
+            SERIALISE_FUNCTION,
+            DESERIALISE_FUNCTION,
+            INITIAL_CLASS_NAME,
+            MIGRATION_CLASS_NAME,
+            MIGRATION_FUNCTION
+        }
+
+        private ConfigurationError configurationError;
+
+        public InvalidMappingConfigurationException(ConfigurationError error) {
+            super("Invalid mapper configuration");
+            this.configurationError = error;
+        }
+
+        public ConfigurationError configurationError() {
+            return configurationError;
+        }
+    }
+
     public static class UnparseableJsonPayloadException extends MappingException {
 
         public UnparseableJsonPayloadException(Throwable cause, String serialisedPayload) {
@@ -87,6 +109,9 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         @Override
         public JsonEventMappingConfiguration<T> create(String initialEventClassName) {
+            if (initialEventClassName == null) {
+                throw new InvalidMappingConfigurationException(InvalidMappingConfigurationException.ConfigurationError.INITIAL_CLASS_NAME);
+            }
             currentClassName = initialEventClassName;
             currentVersion = 1;
             return this;
@@ -94,6 +119,10 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         @Override
         public JsonEventMappingConfiguration<T> migrateFormat(Function1<JsonNode, JsonNode> migration) {
+            if (migration == null) {
+                throw new InvalidMappingConfigurationException(InvalidMappingConfigurationException.ConfigurationError.MIGRATION_FUNCTION);
+            }
+
             migrations = migrations.append(new FormatMigration(currentClassName, currentVersion, currentVersion + 1, migration));
             currentVersion = currentVersion + 1;
             return this;
@@ -101,6 +130,10 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         @Override
         public JsonEventMappingConfiguration<T> migrateClassName(String className) {
+            if (className == null) {
+                throw new InvalidMappingConfigurationException(InvalidMappingConfigurationException.ConfigurationError.MIGRATION_CLASS_NAME);
+            }
+
             Migration migration = new ClassNameMigration(currentClassName, className, currentVersion, currentVersion + 1);
             migrations = migrations.append(migration);
             currentClassName = migration.toClassName();
@@ -110,6 +143,14 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         @Override
         public void mappingFunctions(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction) {
+            if (serialiseFunction == null) {
+                throw new InvalidMappingConfigurationException(InvalidMappingConfigurationException.ConfigurationError.SERIALISE_FUNCTION);
+            }
+
+            if (deserialiseFunction == null) {
+                throw new InvalidMappingConfigurationException(InvalidMappingConfigurationException.ConfigurationError.DESERIALISE_FUNCTION);
+            }
+
             this.serialiseFunction = serialiseFunction;
             this.deserialiseFunction = deserialiseFunction;
         }
