@@ -8,36 +8,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class UserRegisteredEventMappingConfigurer implements JsonEventMappingConfigurer<UserRegistered> {
 
-    public JsonNode migrateVersion1ToVersion2(JsonNode node) {
-        return node;
-    }
-
-    public JsonNode migrateVersion2ToVersion3(JsonNode node) {
-        return node;
-    }
-
-    public JsonNode migrateVersion3ToVersion4(JsonNode node) {
-        return node;
-    }
-
-    public JsonNode migrateVersion4ToVersion6(JsonNode node) {
-        return node;
-    }
-
-    public JsonNode migrateVersion6ToVersion8(JsonNode node) {
-        return node;
-    }
-
     @Override
     public void configure(JsonEventMappingConfigurationFactory<UserRegistered> configurationFactory) {
-        configurationFactory.create("com.dreweaster.domain.UserInstantiated")
-                .migrateFormat(this::migrateVersion1ToVersion2)
-                .migrateFormat(this::migrateVersion2ToVersion3)
-                .migrateFormat(this::migrateVersion3ToVersion4)
-                .migrateClassName("com.dreweaster.domain.UserCreated")
-                .migrateFormat(this::migrateVersion4ToVersion6)
-                .migrateClassName(UserRegistered.class.getName())
-                .migrateFormat(this::migrateVersion6ToVersion8)
+        configurationFactory
+                .create(UserRegistered.class.getName())
                 .mappingFunctions(this::serialise, this::deserialise);
     }
 

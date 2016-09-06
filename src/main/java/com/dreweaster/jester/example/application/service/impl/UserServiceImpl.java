@@ -1,6 +1,7 @@
 package com.dreweaster.jester.example.application.service.impl;
 
-import com.dreweaster.jester.example.application.CommandEnvelope;
+import com.dreweaster.jester.domain.AggregateRepository;
+import com.dreweaster.jester.domain.CommandId;
 import com.dreweaster.jester.example.application.service.UserService;
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.example.domain.aggregates.user.commands.RegisterUser;
@@ -20,9 +21,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Future<AggregateId> createUser(CommandEnvelope<RegisterUser> commandEnvelope) {
-        return userRepository.aggregateRootOf(commandEnvelope.aggregateId())
-                .handle(commandEnvelope.commandId(), commandEnvelope.command())
-                .map(events -> commandEnvelope.aggregateId());
+    public Future<AggregateId> createUser(AggregateId aggregateId, CommandId commandId, RegisterUser registerUser) {
+        return userRepository.aggregateRootOf(aggregateId)
+                .handle(AggregateRepository.CommandEnvelope.of(commandId, registerUser))
+                .map(events -> aggregateId);
     }
 }

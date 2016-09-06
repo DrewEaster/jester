@@ -11,8 +11,6 @@ import javaslang.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
-
 /**
  */
 public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements AggregateRepository<A, C, E, State> {
@@ -36,11 +34,8 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
 
     @Override
     public final AggregateRoot<C, E> aggregateRootOf(AggregateId aggregateId) {
-        return (commandId, command) -> new DeduplicatingCommandHandler(aggregateType).handle(
-                CommandEnvelope.of(
-                        aggregateId,
-                        commandId,
-                        command)
+        return (commandEnvelope) -> new DeduplicatingCommandHandler(aggregateType).handle(
+                AggregateRoutingCommandEnvelopeWrapper.of(aggregateId, commandEnvelope)
         ).map(events -> events.map(PersistedEvent::rawEvent));
     }
 
@@ -53,9 +48,9 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             this.aggregateType = aggregateType;
         }
 
-        public Future<List<PersistedEvent<A, E>>> handle(CommandEnvelope<? extends C> command) {
+        public Future<List<PersistedEvent<A, E>>> handle(AggregateRoutingCommandEnvelopeWrapper<? extends C> wrapper) {
             // TODO: Load snapshot first (if any)
-            return eventStore.loadEvents(aggregateType, command.aggregateId()).flatMap(previousEvents -> {
+            return eventStore.loadEvents(aggregateType, wrapper.aggregateId()).flatMap(previousEvents -> {
                 Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder> tuple = previousEvents.foldLeft(
                         new Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder>(
                                 -1L, List.empty(), commandDeduplicationStrategyFactory.newBuilder()), (acc, e) ->
@@ -65,22 +60,22 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
 
                 AggregateRootRef<A, C, E, State> aggregateRootRef = new AggregateRootRef<>(
                         aggregateType,
-                        command.aggregateId(),
+                        wrapper.aggregateId(),
                         tuple._2);
 
-                if (!deduplicationStrategy.isDuplicate(command.id())) {
+                if (!deduplicationStrategy.isDuplicate(wrapper.commandEnvelope.commandId())) {
                     final Long finalExpectedSequenceNumber = tuple._1;
 
-                    return aggregateRootRef.handle(command.payload()).flatMap(generatedEvents -> eventStore.saveEvents(
+                    return aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEvents -> eventStore.saveEvents(
                             aggregateType,
-                            command.aggregateId(),
-                            command.id(),
+                            wrapper.aggregateId(),
+                            wrapper.commandEnvelope().commandId(),
                             generatedEvents,
                             finalExpectedSequenceNumber));
                 } else {
                     // TODO: We should capture metrics about duplicated commands
                     // TODO: Capture/log/report on age of duplicate commands
-                    LOGGER.info("Skipped processing duplicate command: " + command);
+                    LOGGER.info("Skipped processing duplicate command: " + wrapper.commandEnvelope().command());
                     return Future.successful(List.empty());
                 }
             });
@@ -145,66 +140,34 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
         }
     }
 
-    public static class CommandEnvelope<T> {
+    private static class AggregateRoutingCommandEnvelopeWrapper<T> {
 
-        public static <T> CommandEnvelope<T> of(AggregateId aggregateId, CommandId id, T payload) {
-            return new CommandEnvelope<T>(aggregateId, id, payload) {
-                @Override
-                public AggregateId aggregateId() {
-                    return super.aggregateId();
-                }
-
-                @Override
-                public CommandId id() {
-                    return super.id();
-                }
-            };
-        }
-
-        public static <T> CommandEnvelope<T> of(AggregateId aggregateId, T payload) {
-            return new CommandEnvelope<T>(aggregateId, CommandId.of(UUID.randomUUID().toString()), payload) {
-                @Override
-                public AggregateId aggregateId() {
-                    return super.aggregateId();
-                }
-
-                @Override
-                public CommandId id() {
-                    return super.id();
-                }
-            };
+        public static <T> AggregateRoutingCommandEnvelopeWrapper<T> of(AggregateId aggregateId, CommandEnvelope<T> commandEnvelope) {
+            return new AggregateRoutingCommandEnvelopeWrapper<T>(aggregateId, commandEnvelope);
         }
 
         private AggregateId aggregateId;
 
-        private CommandId id;
+        private CommandEnvelope<T> commandEnvelope;
 
-        private T payload;
-
-        public CommandEnvelope(AggregateId aggregateId, CommandId id, T payload) {
-            this.id = id;
+        public AggregateRoutingCommandEnvelopeWrapper(AggregateId aggregateId, CommandEnvelope<T> commandEnvelope) {
             this.aggregateId = aggregateId;
-            this.payload = payload;
+            this.commandEnvelope = commandEnvelope;
         }
 
         public AggregateId aggregateId() {
             return aggregateId;
         }
 
-        public CommandId id() {
-            return id;
-        }
-
-        public T payload() {
-            return payload;
+        public CommandEnvelope<T> commandEnvelope() {
+            return commandEnvelope;
         }
 
         @Override
         public String toString() {
-            return "CommandEnvelope{" +
+            return "AggregateRoutingCommandEnvelopeWrapper{" +
                     "aggregateId=" + aggregateId +
-                    ", id=" + id +
-                    ", payload=" + payload +
+                    ", commandEnvelope=" + commandEnvelope +
                     '}';
         }
     }

@@ -2,7 +2,6 @@ package com.dreweaster.jester.example;
 
 import com.dreweaster.jester.domain.AggregateId;
 import com.dreweaster.jester.domain.CommandId;
-import com.dreweaster.jester.example.application.CommandEnvelope;
 import com.dreweaster.jester.example.application.service.UserService;
 import com.dreweaster.jester.example.domain.aggregates.user.commands.RegisterUser;
 import com.dreweaster.jester.example.infrastructure.ExampleModule;
@@ -53,13 +52,13 @@ public class ExampleApplication {
         for (int i = 0; i < count; i++) {
             rateLimiter.acquire();
             // Register user for first time
-            userService.createUser(CommandEnvelope.of(
-                            AggregateId.of("deterministic-aggregate-id-" + i),
-                            CommandId.of("deterministic-command-id-" + i),
-                            RegisterUser.builder()
-                                    .username("user" + i)
-                                    .password("password")
-                                    .create())
+            userService.createUser(
+                    AggregateId.of("deterministic-aggregate-id-" + i),
+                    CommandId.of("deterministic-command-id-" + i),
+                    RegisterUser.builder()
+                            .username("user" + i)
+                            .password("password")
+                            .create()
             ).onComplete(responseHandler);
         }
         //long executionTime = System.currentTimeMillis() - startTime;
@@ -68,7 +67,7 @@ public class ExampleApplication {
 
 
         /*// Send same command with different command id
-        userService.createUser(CommandEnvelope.of(
+        userService.createUser(AggregateRoutingCommandEnvelopeWrapper.of(
                         AggregateId.of("deterministic-aggregate-id-1"),
                         CommandId.of("deterministic-command-id-2"),
                         RegisterUser.builder()
@@ -78,7 +77,7 @@ public class ExampleApplication {
         ).onComplete(new ResponseHandler()).await();
 
         // Send same command with duplicate command id
-        userService.createUser(CommandEnvelope.of(
+        userService.createUser(AggregateRoutingCommandEnvelopeWrapper.of(
                         AggregateId.of("deterministic-aggregate-id-1"),
                         CommandId.of("deterministic-command-id-1"),
                         RegisterUser.builder()
