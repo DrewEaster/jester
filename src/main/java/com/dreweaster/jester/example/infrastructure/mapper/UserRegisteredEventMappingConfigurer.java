@@ -38,7 +38,7 @@ public class UserRegisteredEventMappingConfigurer implements JsonEventMappingCon
                 .migrateFormat(this::migrateVersion4ToVersion6)
                 .migrateClassName(UserRegistered.class.getName())
                 .migrateFormat(this::migrateVersion6ToVersion8)
-                .objectMappers(this::serialise, this::deserialise);
+                .mappingFunctions(this::serialise, this::deserialise);
 
         /*(com.dreweaster.domain.UserInstantiated, 1)
                 -> mapVersion1ToVersion2()
@@ -87,7 +87,7 @@ public class UserRegisteredEventMappingConfigurer implements JsonEventMappingCon
     public void configure(JsonEventMappingConfigurationFactory<UserRegistered> configurationFactory) {
         configurationFactory
                 .create(UserRegistered.class.getName())
-                .objectMappers(this::serialise, this::deserialise);
+                .mappingFunctions(this::serialise, this::deserialise);
     }*/
 
     private JsonNode serialise(UserRegistered event, ObjectNode root) {

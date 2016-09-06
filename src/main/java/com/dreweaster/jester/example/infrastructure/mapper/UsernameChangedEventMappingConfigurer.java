@@ -11,7 +11,7 @@ public class UsernameChangedEventMappingConfigurer implements JsonEventMappingCo
     @Override
     public void configure(JsonEventMappingConfigurationFactory<UsernameChanged> configurationFactory) {
         configurationFactory.create(UsernameChanged.class.getName())
-                .objectMappers(this::serialise, this::deserialise);
+                .mappingFunctions(this::serialise, this::deserialise);
     }
 
     public JsonNode serialise(UsernameChanged event, ObjectNode newRoot) {

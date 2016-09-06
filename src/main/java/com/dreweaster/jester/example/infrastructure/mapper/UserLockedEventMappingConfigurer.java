@@ -11,7 +11,7 @@ public class UserLockedEventMappingConfigurer implements JsonEventMappingConfigu
     @Override
     public void configure(JsonEventMappingConfigurationFactory<UserLocked> configurationFactory) {
         configurationFactory.create(UserLocked.class.getName())
-                .objectMappers(this::serialise, this::deserialise);
+                .mappingFunctions(this::serialise, this::deserialise);
     }
 
     public JsonNode serialise(UserLocked event, ObjectNode newRoot) {

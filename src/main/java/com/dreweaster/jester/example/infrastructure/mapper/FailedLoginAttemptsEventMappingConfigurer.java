@@ -11,7 +11,7 @@ public class FailedLoginAttemptsEventMappingConfigurer implements JsonEventMappi
     @Override
     public void configure(JsonEventMappingConfigurationFactory<FailedLoginAttemptsIncremented> configurationFactory) {
         configurationFactory.create(FailedLoginAttemptsIncremented.class.getName())
-                .objectMappers(this::serialise, this::deserialise);
+                .mappingFunctions(this::serialise, this::deserialise);
     }
 
     public JsonNode serialise(FailedLoginAttemptsIncremented event, ObjectNode newRoot) {

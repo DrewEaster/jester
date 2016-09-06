@@ -12,5 +12,7 @@ public interface JsonEventMappingConfiguration<T extends DomainEvent> {
 
     JsonEventMappingConfiguration<T> migrateClassName(String className);
 
-    void objectMappers(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction);
+    void mappingFunctions(
+            Function2<T, ObjectNode, JsonNode> serialiseFunction,
+            Function1<JsonNode, T> deserialiseFunction);
 }

@@ -274,7 +274,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
   }
 
   feature("A JsonEventPayloadMapper rejects competing mapping configurers") {
-    
+
   }
 
   feature("A JsonEventPayloadMapper rejects insufficiently configured mapping configurers") {
@@ -297,7 +297,7 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
       .migrateFormat(migrateVersion4ToVersion6)
       .migrateClassName(classOf[EventWithComplexMigrationHistoryClassName3].getName)
       .migrateFormat(migrateVersion6ToVersion8)
-      .objectMappers(serialise, deserialise)
+      .mappingFunctions(serialise, deserialise)
   }
 
   val serialise: javaslang.Function2[EventWithComplexMigrationHistoryClassName3, ObjectNode, JsonNode] =
@@ -367,7 +367,7 @@ class EventWithNoMigrationHistoryMappingConfigurer extends JsonEventMappingConfi
 
   def configure(configurationFactory: JsonEventMappingConfigurationFactory[EventWithNoMigrationHistory]) {
     configurationFactory.create(classOf[EventWithNoMigrationHistory].getName)
-      .objectMappers(serialise, deserialise)
+      .mappingFunctions(serialise, deserialise)
   }
 
   val serialise: javaslang.Function2[EventWithNoMigrationHistory, ObjectNode, JsonNode] =

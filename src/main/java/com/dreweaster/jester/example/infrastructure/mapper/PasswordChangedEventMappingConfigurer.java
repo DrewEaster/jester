@@ -11,7 +11,7 @@ public class PasswordChangedEventMappingConfigurer implements JsonEventMappingCo
     @Override
     public void configure(JsonEventMappingConfigurationFactory<PasswordChanged> configurationFactory) {
         configurationFactory.create(PasswordChanged.class.getName())
-                .objectMappers(this::serialise, this::deserialise);
+                .mappingFunctions(this::serialise, this::deserialise);
     }
 
     public JsonNode serialise(PasswordChanged event, ObjectNode newRoot) {

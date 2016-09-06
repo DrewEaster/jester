@@ -109,7 +109,7 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
         }
 
         @Override
-        public void objectMappers(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction) {
+        public void mappingFunctions(Function2<T, ObjectNode, JsonNode> serialiseFunction, Function1<JsonNode, T> deserialiseFunction) {
             this.serialiseFunction = serialiseFunction;
             this.deserialiseFunction = deserialiseFunction;
         }
