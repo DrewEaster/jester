@@ -1,8 +1,10 @@
 CREATE TABLE domain_event (
   global_offset   BIGSERIAL PRIMARY KEY,
+  event_id        VARCHAR(36)  NOT NULL,
   aggregate_id    VARCHAR(36)  NOT NULL,
   aggregate_type  VARCHAR(100) NOT NULL,
-  command_id      VARCHAR(36)  NOT NULL,
+  causation_id    VARCHAR(36)  NOT NULL,
+  correlation_id  VARCHAR(36)  NULL,
   event_type      VARCHAR(100) NOT NULL,
   event_version   INT          NOT NULL,
   event_payload   TEXT         NOT NULL,

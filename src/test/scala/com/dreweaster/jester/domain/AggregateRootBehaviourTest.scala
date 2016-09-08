@@ -2,6 +2,7 @@ package com.dreweaster.jester.domain
 
 import javaslang.concurrent.Future
 
+import com.dreweaster.jester.application.eventstore.EventStore.OptimisticConcurrencyException
 import com.dreweaster.jester.application.eventstore.PersistedEvent
 import com.dreweaster.jester.application.repository.deduplicating.{CommandDeduplicationStrategy, CommandDeduplicationStrategyBuilder, CommandDeduplicationStrategyFactory}
 import com.dreweaster.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForEvent, NoHandlerForCommand}
@@ -27,7 +28,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
   val userRepository = new CommandDeduplicatingEventsourcedUserRepository(eventStore, deduplicationStrategyFactory)
 
   before {
-    eventStore.reset()
+    eventStore.clear()
     eventStore.toggleLoadErrorStateOff()
     eventStore.toggleSaveErrorStateOff()
     deduplicationStrategyFactory.toggleDeduplicationOn()
@@ -265,7 +266,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     futureEvents.isSuccess should be(false)
 
     And("the event store's error should be returned")
-    futureEvents.getCause.get shouldBe an[IllegalStateException]
+    futureEvents.getCause.get shouldBe an[OptimisticConcurrencyException]
   }
 
   it should "propagate error when event store fails to save generated events" in {
@@ -341,17 +342,17 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
 
     def newBuilder: CommandDeduplicationStrategyBuilder = {
       new CommandDeduplicationStrategyBuilder() {
-        private var commandIds: Set[CommandId] = Set()
+        private var causationIds: Set[CausationId] = Set()
 
         def addEvent(domainEvent: PersistedEvent[_, _]): CommandDeduplicationStrategyBuilder = {
-          commandIds = commandIds + domainEvent.commandId
+          causationIds = causationIds + domainEvent.causationId()
           this
         }
 
         def build: CommandDeduplicationStrategy = {
           new CommandDeduplicationStrategy {
             override def isDuplicate(commandId: CommandId) =
-              if (deduplicationEnabled) commandIds.contains(commandId) else false
+              if (deduplicationEnabled) causationIds.contains(CausationId.of(commandId.get())) else false
           }
         }
       }

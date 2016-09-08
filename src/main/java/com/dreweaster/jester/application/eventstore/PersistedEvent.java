@@ -1,22 +1,24 @@
 package com.dreweaster.jester.application.eventstore;
 
 import com.dreweaster.jester.domain.*;
+import javaslang.control.Option;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * TODO: Add Option<CorrelationId>
- * TODO: Add EventId
- * TODO: Add Option<CausationId>
  */
 public interface PersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> {
+
+    EventId id();
 
     AggregateType<A, ?, E, ?> aggregateType();
 
     AggregateId aggregateId();
 
-    CommandId commandId();
+    CausationId causationId();
+
+    Option<CorrelationId> correlationId();
 
     Class<E> eventType();
 

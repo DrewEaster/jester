@@ -66,12 +66,22 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 if (!deduplicationStrategy.isDuplicate(wrapper.commandEnvelope.commandId())) {
                     final Long finalExpectedSequenceNumber = tuple._1;
 
-                    return aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEvents -> eventStore.saveEvents(
-                            aggregateType,
-                            wrapper.aggregateId(),
-                            wrapper.commandEnvelope().commandId(),
-                            generatedEvents,
-                            finalExpectedSequenceNumber));
+                    return wrapper.commandEnvelope().correlationId().map(correlationId ->
+                                    aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEvents ->
+                                            eventStore.saveEvents(
+                                                    aggregateType,
+                                                    wrapper.aggregateId(),
+                                                    CausationId.of(wrapper.commandEnvelope().commandId().get()),
+                                                    correlationId,
+                                                    generatedEvents,
+                                                    finalExpectedSequenceNumber))
+                    ).getOrElse(aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEvents ->
+                            eventStore.saveEvents(
+                                    aggregateType,
+                                    wrapper.aggregateId(),
+                                    CausationId.of(wrapper.commandEnvelope().commandId().get()),
+                                    generatedEvents,
+                                    finalExpectedSequenceNumber)));
                 } else {
                     // TODO: We should capture metrics about duplicated commands
                     // TODO: Capture/log/report on age of duplicate commands

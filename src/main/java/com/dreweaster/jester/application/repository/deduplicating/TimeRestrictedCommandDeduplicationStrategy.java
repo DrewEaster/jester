@@ -1,6 +1,7 @@
 package com.dreweaster.jester.application.repository.deduplicating;
 
 import com.dreweaster.jester.application.eventstore.PersistedEvent;
+import com.dreweaster.jester.domain.CausationId;
 import com.dreweaster.jester.domain.CommandId;
 import javaslang.collection.HashSet;
 import javaslang.collection.Set;
@@ -9,22 +10,22 @@ import java.time.LocalDateTime;
 
 public class TimeRestrictedCommandDeduplicationStrategy implements CommandDeduplicationStrategy {
 
-    private Set<CommandId> commandIds = HashSet.empty();
+    private Set<CausationId> causationIds = HashSet.empty();
 
-    private TimeRestrictedCommandDeduplicationStrategy(Set<CommandId> commandIds) {
-        this.commandIds = commandIds;
+    private TimeRestrictedCommandDeduplicationStrategy(Set<CausationId> causationIds) {
+        this.causationIds = causationIds;
     }
 
     @Override
     public boolean isDuplicate(CommandId commandId) {
-        return commandIds.contains(commandId);
+        return causationIds.contains(CausationId.of(commandId.get()));
     }
 
     public static class Builder implements CommandDeduplicationStrategyBuilder {
 
         private LocalDateTime barrierDate;
 
-        private Set<CommandId> commandIds = HashSet.empty();
+        private Set<CausationId> causationIds = HashSet.empty();
 
         public Builder(LocalDateTime barrierDate) {
             this.barrierDate = barrierDate;
@@ -33,14 +34,14 @@ public class TimeRestrictedCommandDeduplicationStrategy implements CommandDedupl
         @Override
         public CommandDeduplicationStrategyBuilder addEvent(PersistedEvent<?, ?> domainEvent) {
             if (domainEvent.timestamp().isAfter(barrierDate)) {
-                commandIds = commandIds.add(domainEvent.commandId());
+                causationIds = causationIds.add(domainEvent.causationId());
             }
             return this;
         }
 
         @Override
         public CommandDeduplicationStrategy build() {
-            return new TimeRestrictedCommandDeduplicationStrategy(commandIds);
+            return new TimeRestrictedCommandDeduplicationStrategy(causationIds);
         }
     }
 }

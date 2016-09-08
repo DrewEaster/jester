@@ -78,14 +78,31 @@ public class Postgres95EventStore implements EventStore {
     public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
             AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
-            CommandId commandId,
+            CausationId causationId,
             List<E> rawEvents,
             Long expectedSequenceNumber) {
-
         return Future.of(executorService, () -> saveEventsForAggregateInstance(
                 aggregateType,
                 aggregateId,
-                commandId,
+                causationId,
+                Option.none(),
+                rawEvents,
+                expectedSequenceNumber));
+    }
+
+    @Override
+    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
+            AggregateType<A, ?, E, ?> aggregateType,
+            AggregateId aggregateId,
+            CausationId causationId,
+            CorrelationId correlationId,
+            List<E> rawEvents,
+            Long expectedSequenceNumber) {
+        return Future.of(executorService, () -> saveEventsForAggregateInstance(
+                aggregateType,
+                aggregateId,
+                causationId,
+                Option.of(correlationId),
                 rawEvents,
                 expectedSequenceNumber));
     }
@@ -93,7 +110,8 @@ public class Postgres95EventStore implements EventStore {
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> saveEventsForAggregateInstance(
             AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
-            CommandId commandId,
+            CausationId causationId,
+            Option<CorrelationId> correlationId,
             List<E> rawEvents,
             Long expectedSequenceNumber) throws SQLException {
 
@@ -108,9 +126,11 @@ public class Postgres95EventStore implements EventStore {
 
                     return new Tuple2<>(acc._1 + 1, acc._2.append(
                             new PostgresEvent<>(
+                                    EventId.createUnique(),
                                     aggregateId,
                                     aggregateType,
-                                    commandId,
+                                    causationId,
+                                    correlationId,
                                     event,
                                     serialisedEvent._1,
                                     serialisedEvent._2,
@@ -121,7 +141,7 @@ public class Postgres95EventStore implements EventStore {
         Long latestSequenceNumber = persistedEvents.last().sequenceNumber();
 
         try (Connection con = dataSource.getConnection();
-             PreparedStatement seps = createSaveEventsBatchedPreparedStatement(con, aggregateType, aggregateId, commandId, persistedEvents);
+             PreparedStatement seps = createSaveEventsBatchedPreparedStatement(con, aggregateType, aggregateId, causationId, correlationId, persistedEvents);
              PreparedStatement saps = createSaveAggregatePreparedStatement(con, aggregateType, aggregateId, latestSequenceNumber, expectedSequenceNumber)) {
 
             con.setAutoCommit(false);
@@ -188,22 +208,29 @@ public class Postgres95EventStore implements EventStore {
             Connection connection,
             AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
-            CommandId commandId,
+            CausationId causationId,
+            Option<CorrelationId> correlationId,
             List<PersistedEvent<A, E>> events) throws SQLException {
 
         PreparedStatement statement = connection.prepareStatement("" +
-                "INSERT INTO domain_event(aggregate_id, aggregate_type, command_id, event_type, event_version, event_payload, event_timestamp, sequence_number) " +
-                "VALUES(?,?,?,?,?,?,?,?)");
+                "INSERT INTO domain_event(event_id, aggregate_id, aggregate_type, causation_id, correlation_id, event_type, event_version, event_payload, event_timestamp, sequence_number) " +
+                "VALUES(?,?,?,?,?,?,?,?,?,?)");
 
         for (PersistedEvent<A, E> event : events) {
-            statement.setString(1, aggregateId.get());
-            statement.setString(2, aggregateType.name());
-            statement.setString(3, commandId.get());
-            statement.setString(4, event.rawEvent().getClass().getName());
-            statement.setInt(5, event.eventVersion());
-            statement.setString(6, ((PostgresEvent<A, E>) event).serialisedEvent()); // TODO: Suspicious casting :-)
-            statement.setTimestamp(7, Timestamp.valueOf(event.timestamp()));
-            statement.setLong(8, event.sequenceNumber());
+            statement.setString(1, event.id().get());
+            statement.setString(2, aggregateId.get());
+            statement.setString(3, aggregateType.name());
+            statement.setString(4, causationId.get());
+            if (correlationId.isDefined()) {
+                statement.setString(5, correlationId.get().get());
+            } else {
+                statement.setString(5, null);
+            }
+            statement.setString(6, event.rawEvent().getClass().getName());
+            statement.setInt(7, event.eventVersion());
+            statement.setString(8, ((PostgresEvent<A, E>) event).serialisedEvent()); // TODO: Suspicious casting :-)
+            statement.setTimestamp(9, Timestamp.valueOf(event.timestamp()));
+            statement.setLong(10, event.sequenceNumber());
             statement.addBatch();
         }
 
@@ -241,7 +268,7 @@ public class Postgres95EventStore implements EventStore {
             Option<Long> afterSequenceNumber) throws SQLException {
 
         PreparedStatement statement = connection.prepareStatement("" +
-                "SELECT global_offset, aggregate_id, aggregate_type, command_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
+                "SELECT global_offset, event_id, aggregate_id, aggregate_type, causation_id, correlation_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
                 "FROM domain_event " +
                 "WHERE aggregate_id = ? AND aggregate_type = ? AND sequence_number > ? " +
                 "ORDER BY sequence_number");
@@ -260,7 +287,7 @@ public class Postgres95EventStore implements EventStore {
             Integer batchSize) throws SQLException {
 
         PreparedStatement statement = connection.prepareStatement("" +
-                "SELECT global_offset, aggregate_id, aggregate_type, command_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
+                "SELECT global_offset, event_id, aggregate_id, aggregate_type, causation_id, correlation_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
                 "FROM domain_event " +
                 "WHERE aggregate_type = ? AND global_offset > ? " +
                 "ORDER BY global_offset " +
@@ -279,19 +306,23 @@ public class Postgres95EventStore implements EventStore {
             AggregateType<A, ?, E, ?> aggregateType)
             throws SQLException, ClassNotFoundException {
         Long offset = rs.getLong(1);
-        AggregateId aggregateId = AggregateId.of(rs.getString(2));
-        CommandId commandId = CommandId.of(rs.getString(4));
-        String eventType = rs.getString(5);
-        Integer eventVersion = rs.getInt(6);
-        String serialisedEvent = rs.getString(7);
+        EventId eventId = EventId.of(rs.getString(2));
+        AggregateId aggregateId = AggregateId.of(rs.getString(3));
+        CausationId causationId = CausationId.of(rs.getString(4));
+        Option<CorrelationId> correlationId = CorrelationId.ofNullable(rs.getString(5));
+        String eventType = rs.getString(6);
+        Integer eventVersion = rs.getInt(7);
+        String serialisedEvent = rs.getString(8);
         E rawEvent = serialiser.deserialise(serialisedEvent, eventType, eventVersion);
-        LocalDateTime timestamp = rs.getTimestamp(8).toLocalDateTime();
-        Long sequenceNumber = rs.getLong(9);
+        LocalDateTime timestamp = rs.getTimestamp(9).toLocalDateTime();
+        Long sequenceNumber = rs.getLong(10);
         return new PostgresStreamEvent<>(
                 offset,
+                eventId,
                 aggregateId,
                 aggregateType,
-                commandId,
+                causationId,
+                correlationId,
                 rawEvent,
                 serialisedEvent,
                 eventVersion,
@@ -305,15 +336,17 @@ public class Postgres95EventStore implements EventStore {
 
         public PostgresStreamEvent(
                 Long offset,
+                EventId eventId,
                 AggregateId aggregateId,
                 AggregateType<A, ?, E, ?> aggregateType,
-                CommandId commandId,
+                CausationId causationId,
+                Option<CorrelationId> correlationId,
                 E rawEvent,
                 String serialisedEvent,
                 Integer eventVersion,
                 LocalDateTime timestamp,
                 Long sequenceNumber) {
-            super(aggregateId, aggregateType, commandId, rawEvent, serialisedEvent, eventVersion, timestamp, sequenceNumber);
+            super(eventId, aggregateId, aggregateType, causationId, correlationId, rawEvent, serialisedEvent, eventVersion, timestamp, sequenceNumber);
             this.offset = offset;
         }
 
@@ -326,11 +359,15 @@ public class Postgres95EventStore implements EventStore {
     private class PostgresEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent>
             implements PersistedEvent<A, E> {
 
+        private EventId eventId;
+
         private AggregateId aggregateId;
 
         private AggregateType<A, ?, E, ?> aggregateType;
 
-        private CommandId commandId;
+        private CausationId causationId;
+
+        private Option<CorrelationId> correlationId;
 
         private E rawEvent;
 
@@ -343,18 +380,22 @@ public class Postgres95EventStore implements EventStore {
         private Long sequenceNumber;
 
         public PostgresEvent(
+                EventId eventId,
                 AggregateId aggregateId,
                 AggregateType<A, ?, E, ?> aggregateType,
-                CommandId commandId,
+                CausationId causationId,
+                Option<CorrelationId> correlationId,
                 E rawEvent,
                 String serialisedEvent,
                 Integer eventVersion,
                 LocalDateTime timestamp,
                 Long sequenceNumber) {
 
+            this.eventId = eventId;
             this.aggregateId = aggregateId;
             this.aggregateType = aggregateType;
-            this.commandId = commandId;
+            this.causationId = causationId;
+            this.correlationId = correlationId;
             this.rawEvent = rawEvent;
             this.serialisedEvent = serialisedEvent;
             this.eventVersion = eventVersion;
@@ -373,8 +414,18 @@ public class Postgres95EventStore implements EventStore {
         }
 
         @Override
-        public CommandId commandId() {
-            return commandId;
+        public EventId id() {
+            return eventId;
+        }
+
+        @Override
+        public CausationId causationId() {
+            return causationId;
+        }
+
+        @Override
+        public Option<CorrelationId> correlationId() {
+            return correlationId;
         }
 
         @Override
@@ -410,10 +461,13 @@ public class Postgres95EventStore implements EventStore {
         @Override
         public String toString() {
             return "PostgresEvent{" +
+                    "eventId=" + eventId +
                     ", aggregateId=" + aggregateId +
                     ", aggregateType=" + aggregateType +
-                    ", commandId=" + commandId +
+                    ", causationId=" + causationId +
+                    ", correlationId=" + correlationId +
                     ", rawEvent=" + rawEvent +
+                    ", serialisedEvent='" + serialisedEvent + '\'' +
                     ", eventVersion=" + eventVersion +
                     ", timestamp=" + timestamp +
                     ", sequenceNumber=" + sequenceNumber +

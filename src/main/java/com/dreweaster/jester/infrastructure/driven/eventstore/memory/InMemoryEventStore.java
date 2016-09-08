@@ -9,14 +9,18 @@ import javaslang.collection.HashMap;
 import javaslang.collection.List;
 import javaslang.collection.Map;
 import javaslang.concurrent.Future;
+import javaslang.control.Option;
 
 import java.time.LocalDateTime;
-
 
 // TODO: Delegate serialisation to an EventPayloadMapper
 public class InMemoryEventStore implements EventStore {
 
     private Map<AggregateType, List> eventStorage = HashMap.empty();
+
+    public void clear() {
+        eventStorage = HashMap.empty();
+    }
 
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
@@ -56,12 +60,33 @@ public class InMemoryEventStore implements EventStore {
                 .take(batchSize));
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
             AggregateType<A, ?, E, ?> aggregateType,
             AggregateId aggregateId,
-            CommandId commandId,
+            CausationId causationId,
+            List<E> rawEvents,
+            Long expectedSequenceNumber) {
+        return doSaveEvents(aggregateType, aggregateId, causationId, Option.none(), rawEvents, expectedSequenceNumber);
+    }
+
+    @Override
+    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
+            AggregateType<A, ?, E, ?> aggregateType,
+            AggregateId aggregateId,
+            CausationId causationId,
+            CorrelationId correlationId,
+            List<E> rawEvents,
+            Long expectedSequenceNumber) {
+        return doSaveEvents(aggregateType, aggregateId, causationId, Option.of(correlationId), rawEvents, expectedSequenceNumber);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> doSaveEvents(
+            AggregateType<A, ?, E, ?> aggregateType,
+            AggregateId aggregateId,
+            CausationId causationId,
+            Option<CorrelationId> correlationId,
             List<E> rawEvents,
             Long expectedSequenceNumber) {
 
@@ -76,7 +101,8 @@ public class InMemoryEventStore implements EventStore {
                                 new SimplePersistedEvent<>(
                                         aggregateType,
                                         aggregateId,
-                                        commandId,
+                                        causationId,
+                                        correlationId,
                                         e,
                                         acc._1
                                 ))))._2;
@@ -133,6 +159,11 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
+        public EventId id() {
+            return persistedEvent.id();
+        }
+
+        @Override
         public Long offset() {
             return offset;
         }
@@ -148,8 +179,13 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public CommandId commandId() {
-            return persistedEvent.commandId();
+        public CausationId causationId() {
+            return persistedEvent.causationId();
+        }
+
+        @Override
+        public Option<CorrelationId> correlationId() {
+            return persistedEvent.correlationId();
         }
 
         @Override
@@ -180,11 +216,15 @@ public class InMemoryEventStore implements EventStore {
 
     private class SimplePersistedEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements PersistedEvent<A, E> {
 
+        private EventId eventId = EventId.createUnique();
+
         private AggregateId aggregateId;
 
         private AggregateType<A, ?, E, ?> aggregateType;
 
-        private CommandId commandId;
+        private CausationId causationId;
+
+        private Option<CorrelationId> correlationId;
 
         private E rawEvent;
 
@@ -195,14 +235,21 @@ public class InMemoryEventStore implements EventStore {
         public SimplePersistedEvent(
                 AggregateType<A, ?, E, ?> aggregateType,
                 AggregateId aggregateId,
-                CommandId commandId,
+                CausationId causationId,
+                Option<CorrelationId> correlationId,
                 E rawEvent,
                 Long sequenceNumber) {
             this.aggregateId = aggregateId;
             this.aggregateType = aggregateType;
-            this.commandId = commandId;
+            this.causationId = causationId;
+            this.correlationId = correlationId;
             this.rawEvent = rawEvent;
             this.sequenceNumber = sequenceNumber;
+        }
+
+        @Override
+        public EventId id() {
+            return eventId;
         }
 
         @Override
@@ -216,8 +263,13 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public CommandId commandId() {
-            return commandId;
+        public CausationId causationId() {
+            return causationId;
+        }
+
+        @Override
+        public Option<CorrelationId> correlationId() {
+            return correlationId;
         }
 
         @Override
@@ -249,12 +301,14 @@ public class InMemoryEventStore implements EventStore {
         @Override
         public String toString() {
             return "SimplePersistedEvent{" +
-                    "aggregateId=" + aggregateId +
+                    "eventId=" + eventId +
+                    ", aggregateId=" + aggregateId +
                     ", aggregateType=" + aggregateType +
-                    ", commandId=" + commandId +
+                    ", causationId=" + causationId +
+                    ", correlationId=" + correlationId +
                     ", rawEvent=" + rawEvent +
-                    ", sequenceNumber=" + sequenceNumber +
                     ", timestamp=" + timestamp +
+                    ", sequenceNumber=" + sequenceNumber +
                     '}';
         }
     }

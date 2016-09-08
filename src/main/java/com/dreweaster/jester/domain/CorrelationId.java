@@ -1,8 +1,14 @@
 package com.dreweaster.jester.domain;
 
+import javaslang.control.Option;
+
 /**
  */
 public class CorrelationId {
+
+    public static Option<CorrelationId> ofNullable(String id) {
+        return id == null ? Option.none() : Option.of(CorrelationId.of(id));
+    }
 
     public static CorrelationId of(String id) {
         if (id == null) {
