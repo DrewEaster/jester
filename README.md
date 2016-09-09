@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/DrewEaster/jester.svg?branch=master)](https://travis-ci.org/DrewEaster/jester)
+
 # Jester
 #### A simple DDD, CQRS and Eventsourcing library for Java
 
