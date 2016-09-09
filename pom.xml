@@ -27,7 +27,7 @@
 
     <scm>
         <url>https://github.com/DrewEaster/jester</url>
-        <connection>scm:git:git://github.com/DrewEaster/jester.git</connection>
+        <connection>scm:git:git@github.com:DrewEaster/jester.git</connection>
         <developerConnection>scm:git:git@github.com:DrewEaster/jester.git</developerConnection>
     </scm>
 
