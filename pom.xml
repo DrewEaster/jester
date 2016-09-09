@@ -7,7 +7,7 @@
     <groupId>com.dreweaster.ddd.jester</groupId>
     <artifactId>jester-parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1</version>
     <modules>
         <module>jester-core</module>
         <module>jester-postgres-eventstore</module>
@@ -16,16 +16,27 @@
         <module>jester-inmemory-eventstore</module>
     </modules>
 
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <scalaVersion>2.11.8</scalaVersion>
+        <bintray.subject>dreweaster</bintray.subject>
+        <bintray.repo>projects</bintray.repo>
+        <bintray.package>jester</bintray.package>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <scm>
+        <url>https://github.com/dreweaster/jester</url>
+        <connection>scm:git:git://github.com/dreweaster/jester.git</connection>
+        <developerConnection>scm:git:git@github.com:dreweaster/jester.git</developerConnection>
+    </scm>
+
     <distributionManagement>
         <repository>
             <id>bintray-repo-jester</id>
-            <url>https://api.bintray.com/maven/dreweaster/projects/jester/;publish=1</url>
+            <url>https://api.bintray.com/maven/${bintray.subject}/${bintray.repo}/${bintray.package}/;publish=1</url>
         </repository>
     </distributionManagement>
-
-    <properties>
-        <scalaVersion>2.11.8</scalaVersion>
-    </properties>
 
     <dependencies>
         <dependency>
@@ -77,6 +88,16 @@
         <pluginManagement>
             <plugins>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>2.3.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>2.1.2</version>
+                </plugin>
+                <plugin>
                     <groupId>net.alchim31.maven</groupId>
                     <artifactId>scala-maven-plugin</artifactId>
                     <version>3.2.2</version>
@@ -93,10 +114,21 @@
         </pluginManagement>
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.3</version>
+            </plugin>
+            <plugin>
+                <artifactId>maven-scm-plugin</artifactId>
+                <version>1.9.5</version>
+                <configuration>
+                    <tag>jester-${project.version}</tag>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
             </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
