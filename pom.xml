@@ -26,9 +26,9 @@
     </properties>
 
     <scm>
-        <url>https://github.com/dreweaster/jester</url>
-        <connection>scm:git:git://github.com/dreweaster/jester.git</connection>
-        <developerConnection>scm:git:git@github.com:dreweaster/jester.git</developerConnection>
+        <url>https://github.com/DrewEaster/jester</url>
+        <connection>scm:git:git://github.com/DrewEaster/jester.git</connection>
+        <developerConnection>scm:git:git@github.com:DrewEaster/jester.git</developerConnection>
     </scm>
 
     <distributionManagement>
