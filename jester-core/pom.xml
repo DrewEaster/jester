@@ -11,8 +11,4 @@
     <packaging>jar</packaging>
 
     <artifactId>jester-core</artifactId>
-
-    <properties>
-        <maven.deploy.skip>false</maven.deploy.skip>
-    </properties>
 </project>

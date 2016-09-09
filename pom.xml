@@ -22,7 +22,6 @@
         <bintray.subject>dreweaster</bintray.subject>
         <bintray.repo>projects</bintray.repo>
         <bintray.package>jester</bintray.package>
-        <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
     <scm>
