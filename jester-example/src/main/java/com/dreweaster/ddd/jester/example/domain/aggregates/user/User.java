@@ -4,11 +4,8 @@ import com.dreweaster.ddd.jester.domain.Aggregate;
 import com.dreweaster.ddd.jester.domain.Behaviour;
 import com.dreweaster.ddd.jester.domain.BehaviourBuilder;
 import com.dreweaster.ddd.jester.domain.AggregateType;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.UserCommand;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.events.UserEvent;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.events.*;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.*;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.UserState;
+import com.dreweaster.ddd.jester.example.domain.aggregates.user.events.*;
 
 // TODO: Deal with snapshots when implemented
 public class User extends Aggregate<UserCommand, UserEvent, UserState> {

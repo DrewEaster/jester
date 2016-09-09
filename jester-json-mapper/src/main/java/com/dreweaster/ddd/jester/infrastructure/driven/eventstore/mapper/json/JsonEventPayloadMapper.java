@@ -15,7 +15,6 @@ import javaslang.collection.Map;
 import java.io.IOException;
 import java.util.function.Function;
 
-// TODO: Refactor into separate child maven module
 public class JsonEventPayloadMapper implements EventPayloadMapper {
 
     public static class InvalidMappingConfigurationException extends MappingException {
@@ -79,7 +78,7 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
         // TODO: Validate no clashes between registered mappers
         // e.g. what if two mappers try to convert to the same event class?
-        // e.g. what if a migration in one mapper maps to a class name in another mapper?
+        // e.g. what if a com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration in one mapper maps to a class name in another mapper?
         // Such scenarios should be made impossible (at least for v1...)
 
         List<MappingConfiguration> mappingConfigurations = configurers.map(configurer -> {

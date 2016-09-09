@@ -17,9 +17,6 @@ import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 
 /**
- * TODO: Refactor into separate child maven module
- * TODO: Aggregate types and event types - relying on straight class names is not ideal. Need immunity from refactoring
- * TODO: Need to think about event format evolution over time
  * TODO: Implement integration tests using Postgres started by Docker (via Maven).
  */
 public class Postgres95EventStore implements EventStore {

@@ -11,7 +11,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
   val objectMapper = new ObjectMapper()
 
-  feature("A JsonEventPayloadMapper can deserialise different versions of a conceptual event with a complex migration history") {
+  feature("A JsonEventPayloadMapper can deserialise different versions of a conceptual event with a complex com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
 
     val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(
       new EventWithComplexMigrationHistoryMappingConfigurer
@@ -194,7 +194,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
     val payloadMapper = new JsonEventPayloadMapper(objectMapper, configurers)
 
-    scenario("Deserialises correctly an event that has no migration history") {
+    scenario("Deserialises correctly an event that has no com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
       Given("a payload for the event")
       val eventPayload = objectMapper.createObjectNode()
         .put("forename", "joe")
@@ -214,7 +214,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
       event.active should be(true)
     }
 
-    scenario("Deserialises correctly the latest version of an event with migration history") {
+    scenario("Deserialises correctly the latest version of an event with com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
       Given("a latest versioned payload for the event")
       val eventPayload = objectMapper.createObjectNode()
         .put("forename", "joe")
@@ -243,8 +243,8 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
     val payloadMapper = new JsonEventPayloadMapper(objectMapper, configurers)
 
-    scenario("Serialises correctly an event that has no migration history") {
-      When("serialising an event with no migration history")
+    scenario("Serialises correctly an event that has no com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
+      When("serialising an event with no com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history")
       val result = payloadMapper.serialise(new EventWithNoMigrationHistory("joe", "bloggs", true))
 
       Then("the event payload should be serialised correctly in JSON")
@@ -258,8 +258,8 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
       result._2 should be(1)
     }
 
-    scenario("Serialises correctly an event with migration history") {
-      When("serialising an event with migration history")
+    scenario("Serialises correctly an event with com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
+      When("serialising an event with com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history")
       val result = payloadMapper.serialise(new EventWithComplexMigrationHistoryClassName3("joe", "bloggs", true))
 
       Then("the event payload should be serialised correctly in JSON")
@@ -335,8 +335,8 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
       thrown.configurationError() should be(INITIAL_CLASS_NAME)
     }
 
-    scenario("Rejects a null migration function") {
-      Given("a configurer declaring a null migration function")
+    scenario("Rejects a null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration function") {
+      Given("a configurer declaring a null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration function")
       val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
         override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
           configurationFactory
@@ -358,12 +358,12 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
       When("creating a JsonEventPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
 
-      Then("the null null migration function should be rejected")
+      Then("the null null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration function should be rejected")
       thrown.configurationError() should be(MIGRATION_FUNCTION)
     }
 
-    scenario("Rejects a null migration class name") {
-      Given("a configurer declaring a null migration class name")
+    scenario("Rejects a null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration class name") {
+      Given("a configurer declaring a null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration class name")
       val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
         override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
           configurationFactory
@@ -385,7 +385,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
       When("creating a JsonEventPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
 
-      Then("the null null migration class name should be rejected")
+      Then("the null null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration class name should be rejected")
       thrown.configurationError() should be(MIGRATION_CLASS_NAME)
     }
   }

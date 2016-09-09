@@ -3,6 +3,7 @@ package com.dreweaster.ddd.jester.example;
 import com.dreweaster.ddd.jester.domain.AggregateId;
 import com.dreweaster.ddd.jester.domain.CommandId;
 import com.dreweaster.ddd.jester.example.application.service.UserService;
+import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.RegisterUser;
 import com.dreweaster.ddd.jester.example.infrastructure.ExampleModule;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.Guice;
@@ -17,11 +18,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.events.*;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.*;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.UserState;
-
-// TODO: Refactor into separate child maven module
 public class ExampleApplication {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ExampleApplication.class);
