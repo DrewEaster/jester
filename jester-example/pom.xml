@@ -13,7 +13,6 @@
 
     <properties>
         <jackson.version>2.8.1</jackson.version>
-        <maven.deploy.skip>false</maven.deploy.skip>
     </properties>
 
     <dependencies>
