@@ -16,6 +16,13 @@
         <module>jester-inmemory-eventstore</module>
     </modules>
 
+    <distributionManagement>
+        <repository>
+            <id>bintray-repo-jester</id>
+            <url>https://api.bintray.com/maven/dreweaster/projects/jester/;publish=1</url>
+        </repository>
+    </distributionManagement>
+
     <properties>
         <scalaVersion>2.11.8</scalaVersion>
     </properties>
