@@ -32,7 +32,7 @@
 
     <distributionManagement>
         <repository>
-            <id>bintray-repo-jester</id>
+            <id>bintray-dreweaster-projects</id>
             <url>https://api.bintray.com/maven/${bintray.subject}/${bintray.repo}/${bintray.package}/;publish=1</url>
         </repository>
     </distributionManagement>

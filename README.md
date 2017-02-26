@@ -13,6 +13,10 @@ Jester's design is sympathetic to those wishing to follow the [hexagonal archite
 
 ## User Manual
 
+### Before you begin
+
+These instructions follow through an example whereby domain classes are created from scratch, thus falling foul of Java's rather verbose syntax. It's highly recommended that you choose an annotation based code generation library to remove the verbosity. The [example](https://github.com/DrewEaster/jester/tree/master/jester-example) project makes use of the fantastic [Immutables](https://immutables.github.io/) library which not only removes verbosity, but also supports you in baking immutability into your domain classes. You'll need to setup your IDE for annotation processing - Immutables has clear [instructions](https://immutables.github.io/apt.html) on how to do this for the leading JVM IDEs. 
+
 ### The basics
 
 Jester is a DDD library containing a set of abstractions to help you build an eventsourced domain model. It is the intention for Jester to be an enabler of event-driven systems. The key concepts you'll encounter are:
@@ -52,7 +56,7 @@ At any point in time, an instance of an aggregate has a current `Behaviour`. Beh
 * Command handlers that define how the behaviour handles commands sent to it
 * Event handlers that define how the behaviour translates events into changes in the aggregate's state and, optionally, the shift to a new behaviour (analogous to switching a state machine to a new state).
 
-An aggregate must start off with an initial behaviour. This is  the way an instance of the aggregate should behave before it has processed its first command. This is essentially the aggregate's _pre-creation_ behaviour. To define this initial behaviour, we need to implement the abstract `initialBehaviour()` method from the `Aggregate` base class.
+An aggregate must start off with an initial behaviour. This is the way an instance of the aggregate should behave before it has processed its first command. This is essentially the aggregate's _pre-creation_ behaviour. To define this initial behaviour, we need to implement the abstract `initialBehaviour()` method from the `Aggregate` base class.
 
 ```java
 public Behaviour<UserCommand, UserEvent, UserState> initialBehaviour() {
@@ -172,7 +176,26 @@ It's really important when we're using eventsourcing that we separate command ha
 
 It's really important to note that event handlers can't fail and must be side effect free. As events are a fact, something that has already happened, we can't possibly reject them during replay. Thus, it's imperative that you fail fast when replaying events if there's a problem - you can't just ignore a failed event and move onto further events. In such a case, your aggregate would be in an inconsistent state when processing the next command. Event handling should, therefore, be very dumb - nothing more than simple code that takes a sequence of events, applying each event one by one to reach a cumulative view of an aggregate's current state. Event handlers must be side effect free because they are called everytime an aggregate is recovered from the underlying event store, and you definitely wouldn't want any side effects to be triggered every time that happens!
 
-##### Testing
+Event handlers can either retain the existing behaviour or transition your aggregate into a new behaviour. You are encouraged to consider breaking your aggregate's lifecycle down into separate behaviours, much like a classic state machine. Whilst it's possible to deal with only two behaviours (i.e. pre-creation and post-creation), it can help with structure, semantics and readability if you split up your aggregate up into multiple behaviours over the course of its lifetime. This has the added benefit of encouraging you to think about your domain in a behavioural way, which is vital to the optimal application of DDD.
+
+Let's get on to creating an event handler!
+
+Our goal is to apply the `UserRegistered` event we generated from our `RegisterUser` command:
+
+```java
+behaviourBuilder.setEventHandler(UserRegistered.class, (evt, currentBehaviour) ->
+        createdBehaviour(currentBehaviour.state()
+                .withUsername(evt.username())
+                .withPassword(evt.password())));
+```   
+
+As you can see, the event handler lets you map an event type (`UserRegistered.class`) to a function that takes in an instance of the event type and the current behaviour of the aggregate. The goal is to transition existing state based on the data within the event and, optionally, transition to a new behaviour at the same time. In this case, we take the existing state (available from the current behaviour), apply the new properties, and return the updated state within a new behaviour. We've successfully transitioned from our initial behaviour (pre-creation) to our created behaviour, thus reflecting that our aggregate with the given id now exists within the domain.
+
+When Jester is reloading an aggregate into memory in order to process a new command, it will replay all previous events first via your defined event handlers. This means that you can trust the state of the aggregate you query during command handling will be an up-to-date state of that aggregate, allowing you to apply your business invariants correctly. In a later section on optimistic concurrency control you'll learn how Jester helps you deal with scenarios where multiple simultaneous updates clash with each other.
+
+##### Testing 
+
+TBC
 
 ### Sending commands from your application
 
