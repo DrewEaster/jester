@@ -4,6 +4,8 @@ import javaslang.collection.List;
 import javaslang.concurrent.Future;
 import javaslang.control.Option;
 
+import java.util.Optional;
+
 public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> {
 
     class CommandEnvelope<C> {
@@ -90,7 +92,7 @@ public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends
         }
     }
 
-    interface AggregateRoot<C extends DomainCommand, E extends DomainEvent> {
+    interface AggregateRoot<C extends DomainCommand, E extends DomainEvent, State> {
 
         class NoHandlerForCommand extends RuntimeException {
 
@@ -107,7 +109,9 @@ public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends
         }
 
         Future<List<? super E>> handle(CommandEnvelope<C> commandEnvelope);
+
+        Future<Optional<State>> state();
     }
 
-    AggregateRoot<C, E> aggregateRootOf(AggregateId aggregateId);
+    AggregateRoot<C, E, State> aggregateRootOf(AggregateId aggregateId);
 }

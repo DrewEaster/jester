@@ -1,14 +1,19 @@
 package com.dreweaster.ddd.jester.behaviour
 
+import java.util.Optional
 import javaslang.concurrent.Future
+import javaslang.control
+import javaslang.control.Option
+import javax.tools.OptionChecker
 
 import com.dreweaster.ddd.jester.application.eventstore.EventStore.OptimisticConcurrencyException
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent
 import com.dreweaster.ddd.jester.application.repository.deduplicating.{CommandDeduplicationStrategy, CommandDeduplicationStrategyBuilder, CommandDeduplicationStrategyFactory}
-import com.dreweaster.ddd.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForEvent, NoHandlerForCommand}
-import com.dreweaster.ddd.jester.domain.{CausationId, CommandId, AggregateId}
+import com.dreweaster.ddd.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForCommand, NoHandlerForEvent}
+import com.dreweaster.ddd.jester.domain.{AggregateId, CausationId, CommandId}
 import com.dreweaster.ddd.jester.domain.AggregateRepository.CommandEnvelope
 import com.dreweaster.ddd.jester.example.application.repository.CommandDeduplicatingEventsourcedUserRepository
+import com.dreweaster.ddd.jester.example.domain.aggregates.user
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.User.AlreadyRegistered
 import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.MockEventStore
 import org.scalatest.{BeforeAndAfter, FlatSpec, GivenWhenThen, Matchers}
@@ -57,6 +62,73 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     futureEvents.get().get(0) should be(UserRegistered.builder()
       .username("joebloggs")
       .password("password")
+      .create())
+  }
+
+  it should "return empty option when fetching state prior to its creation" in {
+    Given("an aggregate that has not yet been created")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+
+    When("trying to fetch state")
+    val state = await(user.state())
+
+    Then("the state should be an empty option")
+    state.get() should be (Optional.empty())
+  }
+
+  it should "return the initial state following handling its creation command" in {
+    Given("an aggregate that has not yet been created")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+
+    When("sending a command to create the aggregate")
+    await(user.handle(
+      CommandEnvelope.of(
+        CommandId.of("some_command_id"),
+        RegisterUser.builder()
+          .username("joebloggs")
+          .password("password")
+          .create())))
+
+    And("then fetching the current state")
+    val state = await(user.state())
+
+    Then("the state should be defined")
+    state.get().isPresent should be(true)
+
+    And("the state should be correct")
+    state.get().get() should be(UserState.builder()
+      .username("joebloggs")
+      .password("password")
+      .failedLoginAttempts(0)
+      .create())
+  }
+
+  it should "return current state following processing of multiple commands" in  {
+    Given("An aggregate that's handled some commands")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+    await(user.handle(
+      CommandEnvelope.of(
+        CommandId.of("command_id_1"),
+        RegisterUser.builder()
+          .username("joebloggs")
+          .password("password")
+          .create())))
+
+    await(user.handle(CommandEnvelope.of(CommandId.of("command_id_2"), IncrementFailedLoginAttempts.of())))
+    await(user.handle(CommandEnvelope.of(CommandId.of("command_id_3"), IncrementFailedLoginAttempts.of())))
+    await(user.handle(CommandEnvelope.of(CommandId.of("command_id_4"), IncrementFailedLoginAttempts.of())))
+
+    And("then fetching the current state")
+    val state = await(user.state())
+
+    Then("the state should be defined")
+    state.get().isPresent should be(true)
+
+    And("the state should be correct")
+    state.get().get() should be(UserState.builder()
+      .username("joebloggs")
+      .password("password")
+      .failedLoginAttempts(3)
       .create())
   }
 
@@ -248,7 +320,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     futureEvents.getCause.get shouldBe an[NoHandlerForEvent]
   }
 
-  it should "propagate error when event store fails to load events" in {
+  it should "propagate error if event store fails to load events when handling a command" in {
     Given("the event store can't load events")
     eventStore.toggleLoadErrorStateOn()
 
@@ -269,6 +341,23 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
 
     And("the event store's error should be returned")
     futureEvents.getCause.get shouldBe an[OptimisticConcurrencyException]
+  }
+
+  it should "propagate error if event store fails to load events when fetching state" in {
+    Given("the event store can't load events")
+    eventStore.toggleLoadErrorStateOn()
+
+    And("an aggregate")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+
+    When("fetching current state")
+    val state = await(user.state())
+
+    Then("the operation should fail")
+    state.isSuccess should be(false)
+
+    And("the event store's error should be returned")
+    state.getCause.get shouldBe an[OptimisticConcurrencyException]
   }
 
   it should "propagate error when event store fails to save generated events" in {

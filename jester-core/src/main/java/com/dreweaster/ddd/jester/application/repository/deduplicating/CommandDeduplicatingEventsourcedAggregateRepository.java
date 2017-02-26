@@ -11,6 +11,8 @@ import javaslang.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
+
 /**
  */
 public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A extends Aggregate<C, E, State>, C extends DomainCommand, E extends DomainEvent, State> implements AggregateRepository<A, C, E, State> {
@@ -33,22 +35,37 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
     }
 
     @Override
-    public final AggregateRoot<C, E> aggregateRootOf(AggregateId aggregateId) {
-        return (commandEnvelope) -> new DeduplicatingCommandHandler(aggregateType).handle(
-                AggregateRoutingCommandEnvelopeWrapper.of(aggregateId, commandEnvelope)
-        ).map(events -> events.map(PersistedEvent::rawEvent));
+    public final AggregateRoot<C, E, State> aggregateRootOf(AggregateId aggregateId) {
+        return new DeduplicatingCommandHandler(aggregateId, aggregateType);
     }
 
     // TODO: Snapshots will have to store last n minutes/hours/days of command ids within their payload.
-    private class DeduplicatingCommandHandler {
+    private class DeduplicatingCommandHandler implements AggregateRoot<C, E, State> {
 
         private AggregateType<A, C, E, State> aggregateType;
 
-        public DeduplicatingCommandHandler(AggregateType<A, C, E, State> aggregateType) {
+        private AggregateId aggregateId;
+
+        public DeduplicatingCommandHandler(AggregateId aggregateId, AggregateType<A, C, E, State> aggregateType) {
+            this.aggregateId = aggregateId;
             this.aggregateType = aggregateType;
         }
 
-        public Future<List<PersistedEvent<A, E>>> handle(AggregateRoutingCommandEnvelopeWrapper<? extends C> wrapper) {
+        @Override
+        public Future<Optional<State>> state() {
+            return eventStore.loadEvents(aggregateType, aggregateId).flatMap(previousEvents -> new AggregateRootRef<>(
+                    aggregateType,
+                    aggregateId,
+                    previousEvents.map(PersistedEvent::rawEvent)).state());
+        }
+
+        @Override
+        public Future<List<? super E>> handle(CommandEnvelope<C> commandEnvelope) {
+            return doHandle(AggregateRoutingCommandEnvelopeWrapper.of(aggregateId, commandEnvelope)).map(events ->
+                    events.map(PersistedEvent::rawEvent));
+        }
+
+        private Future<List<PersistedEvent<A, E>>> doHandle(AggregateRoutingCommandEnvelopeWrapper<? extends C> wrapper) {
             // TODO: Load snapshot first (if any)
             return eventStore.loadEvents(aggregateType, wrapper.aggregateId()).flatMap(previousEvents -> {
                 Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder> tuple = previousEvents.foldLeft(
@@ -104,6 +121,36 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             this.aggregateType = aggregateType;
             this.aggregateId = aggregateId;
             this.previousEvents = previousEvents;
+        }
+
+        public Future<Optional<State>> state() {
+            Promise<Optional<State>> promise = Promise.make();
+
+            if(previousEvents.isEmpty()) {
+                promise.success(Optional.empty());
+            } else {
+                try {
+                    A aggregateInstance = aggregateType.clazz().newInstance();
+
+                    // TODO: Pass snapshot once implemented
+                    Behaviour<C, E, State> behaviour = aggregateInstance.initialBehaviour();
+
+                    for (E event : previousEvents) {
+                        Either<Throwable, Behaviour<C, E, State>> maybeBehaviour = behaviour.handleEvent(event);
+                        if (maybeBehaviour.isLeft()) {
+                            promise.failure(maybeBehaviour.getLeft());
+                            return promise.future();
+                        }
+                        behaviour = behaviour.handleEvent(event).get();
+                    }
+                    promise.success(Optional.of(behaviour.state()));
+                } catch (Exception ex) {
+                    // TODO: Do we need to handle this more specifically? Caused by aggregate instance creation failure
+                    promise.failure(ex);
+                }
+            }
+
+            return promise.future();
         }
 
         public Future<List<E>> handle(C command) {
