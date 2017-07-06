@@ -43,11 +43,11 @@ public class ExampleApplication {
 
         UserService userService = injector.getInstance(UserService.class);
 
-        RateLimiter rateLimiter = RateLimiter.create(1000);
+        RateLimiter rateLimiter = RateLimiter.create(20000);
 
         ReportingResponseHandler responseHandler = new ReportingResponseHandler();
 
-        int count = 10000;
+        int count = 20000;
         for (int i = 0; i < count; i++) {
             rateLimiter.acquire();
             // Register user for first time
@@ -60,10 +60,8 @@ public class ExampleApplication {
                             .create()
             ).onComplete(responseHandler);
         }
-        //long executionTime = System.currentTimeMillis() - startTime;
-        //long executionTimeSeconds = executionTime / 1000;
-        //LOGGER.info("Executed in " + executionTime + "ms (" + (count / executionTimeSeconds) + "tps)");
 
+        Thread.sleep(20000);
 
         /*// Send same command with different command id
         userService.createUser(AggregateRoutingCommandEnvelopeWrapper.of(

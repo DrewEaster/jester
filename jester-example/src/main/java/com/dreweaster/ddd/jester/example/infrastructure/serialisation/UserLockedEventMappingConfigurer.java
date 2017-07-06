@@ -1,12 +1,10 @@
-package com.dreweaster.ddd.jester.example.infrastructure.mapper;
+package com.dreweaster.ddd.jester.example.infrastructure.serialisation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.JsonEventMappingConfigurer;
 import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.JsonEventMappingConfigurationFactory;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.events.*;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.*;
-import com.dreweaster.ddd.jester.example.domain.aggregates.user.UserState;
 
 public class UserLockedEventMappingConfigurer implements JsonEventMappingConfigurer<UserLocked> {
 

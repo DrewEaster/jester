@@ -3,6 +3,7 @@ CREATE TABLE domain_event (
   event_id        VARCHAR(36)  NOT NULL,
   aggregate_id    VARCHAR(36)  NOT NULL,
   aggregate_type  VARCHAR(100) NOT NULL,
+  tag             VARCHAR(100) NOT NULL,
   causation_id    VARCHAR(36)  NOT NULL,
   correlation_id  VARCHAR(36)  NULL,
   event_type      VARCHAR(100) NOT NULL,
@@ -18,5 +19,6 @@ CREATE TABLE aggregate_root (
   aggregate_id      VARCHAR(36)  NOT NULL,
   aggregate_type    VARCHAR(100) NOT NULL,
   aggregate_version BIGINT       NOT NULL,
+  aggregate_state   JSONB        NULL,
   PRIMARY KEY (aggregate_id, aggregate_type)
 );

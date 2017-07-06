@@ -30,8 +30,8 @@ public class MockEventStore extends InMemoryEventStore {
     }
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public synchronized <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> loadEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId) {
 
         if (loadErrorState) {
@@ -43,8 +43,8 @@ public class MockEventStore extends InMemoryEventStore {
     }
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public synchronized <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> saveEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId,
             CausationId causationId,
             List<E> rawEvents,
@@ -57,8 +57,8 @@ public class MockEventStore extends InMemoryEventStore {
     }
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public synchronized <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> saveEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId,
             CausationId causationId,
             CorrelationId correlationId,

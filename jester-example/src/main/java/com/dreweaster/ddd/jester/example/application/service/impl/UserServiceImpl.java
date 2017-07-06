@@ -10,6 +10,8 @@ import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.Registe
 
 import javax.inject.Inject;
 
+import static com.dreweaster.ddd.jester.domain.AggregateRepository.*;
+
 // TODO: Error handling (Future.recover?)
 public class UserServiceImpl implements UserService {
 
@@ -23,7 +25,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public Future<AggregateId> createUser(AggregateId aggregateId, CommandId commandId, RegisterUser registerUser) {
         return userRepository.aggregateRootOf(aggregateId)
-                .handle(AggregateRepository.CommandEnvelope.of(commandId, registerUser))
+                .handle(CommandEnvelope.of(commandId, registerUser))
                 .map(events -> aggregateId);
     }
 }

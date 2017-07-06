@@ -1,6 +1,8 @@
 package com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json;
 
-import com.dreweaster.ddd.jester.application.eventstore.EventPayloadMapper;
+import com.dreweaster.ddd.jester.application.eventstore.PayloadMapper;
+import com.dreweaster.ddd.jester.application.eventstore.SerialisationContentType;
+import com.dreweaster.ddd.jester.domain.Aggregate;
 import com.dreweaster.ddd.jester.domain.DomainEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +17,7 @@ import javaslang.collection.Map;
 import java.io.IOException;
 import java.util.function.Function;
 
-public class JsonEventPayloadMapper implements EventPayloadMapper {
+public class JsonPayloadMapper implements PayloadMapper {
 
     public static class InvalidMappingConfigurationException extends MappingException {
 
@@ -64,13 +66,25 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
     private ObjectMapper objectMapper;
 
-    private Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> deserialisers = HashMap.empty();
+    private Map<Tuple2<String, Integer>, Function1<String, DomainEvent>> eventDeserialisers = HashMap.empty();
 
-    private Map<String, Function1<DomainEvent, Tuple2<String, Integer>>> serialisers = HashMap.empty();
+    private Map<String, Function1<DomainEvent, Tuple2<String, Integer>>> eventSerialisers = HashMap.empty();
 
-    public JsonEventPayloadMapper(ObjectMapper objectMapper, List<JsonEventMappingConfigurer<?>> mappers) {
+    private Map<Class<?>, StatePayloadJsonSerialiser<?,?>> stateSerialisers = HashMap.empty();
+
+    public JsonPayloadMapper(
+            ObjectMapper objectMapper,
+            List<JsonEventMappingConfigurer<?>> eventMappers,
+            List<StatePayloadJsonSerialiser<?,?>> stateSerialisers) {
         this.objectMapper = objectMapper;
-        init(mappers);
+
+        // Prepare event mappers
+        init(eventMappers);
+
+        // Prepare state serialisers
+        this.stateSerialisers = stateSerialisers.foldLeft(
+                HashMap.<Class<?>, StatePayloadJsonSerialiser<?,?>>empty(),
+                (acc,item) -> acc.put(item.stateClass(), item));
     }
 
     @SuppressWarnings("unchecked")
@@ -87,10 +101,10 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
             return mappingConfiguration;
         });
 
-        deserialisers = mappingConfigurations.foldLeft(deserialisers, (acc, mappingConfiguration) ->
+        eventDeserialisers = mappingConfigurations.foldLeft(eventDeserialisers, (acc, mappingConfiguration) ->
                 acc.merge(mappingConfiguration.createDeserialisers()));
 
-        serialisers = mappingConfigurations.foldLeft(serialisers, (acc, mappingConfiguration) ->
+        eventSerialisers = mappingConfigurations.foldLeft(eventSerialisers, (acc, mappingConfiguration) ->
                 acc.put(mappingConfiguration.createSerialiser()));
     }
 
@@ -221,12 +235,12 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends DomainEvent> T deserialise(
+    public <T extends DomainEvent> T deserialiseEvent(
             String serialisedPayload,
             String serialisedEventType,
             Integer serialisedEventVersion) {
 
-        Function1<String, DomainEvent> deserialiser = deserialisers
+        Function1<String, DomainEvent> deserialiser = eventDeserialisers
                 .get(new Tuple2<>(serialisedEventType, serialisedEventVersion))
                 .getOrElseThrow(() -> new MissingDeserialiserException(
                         serialisedEventType,
@@ -237,13 +251,27 @@ public class JsonEventPayloadMapper implements EventPayloadMapper {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends DomainEvent> Tuple2<String, Integer> serialise(T event) {
+    public <T extends DomainEvent> PayloadSerialisationResult serialiseEvent(T event) {
 
-        Function1<DomainEvent, Tuple2<String, Integer>> serialiser = serialisers
+        Function1<DomainEvent, Tuple2<String, Integer>> serialiser = eventSerialisers
                 .get(event.getClass().getName())
                 .getOrElseThrow(() -> new MissingSerialiserException(event.getClass().getName()));
 
-        return serialiser.apply(event);
+        Tuple2<String,Integer> versionedPayload = serialiser.apply(event);
+
+        return PayloadSerialisationResult.of(
+                versionedPayload._1,
+                SerialisationContentType.JSON,
+                versionedPayload._2
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <A extends Aggregate<?, ?, State>, State> PayloadSerialisationResult serialiseState(State state) {
+        return ((StatePayloadJsonSerialiser<A,State>)stateSerialisers
+                .get(state.getClass()).getOrElseThrow(() -> new MissingSerialiserException(state.getClass().getName())))
+                .serialise(state, objectMapper.createObjectNode());
     }
 
     private interface Migration {

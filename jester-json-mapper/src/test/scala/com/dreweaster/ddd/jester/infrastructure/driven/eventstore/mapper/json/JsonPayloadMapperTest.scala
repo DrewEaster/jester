@@ -1,23 +1,25 @@
 package com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json
 
-import com.dreweaster.ddd.jester.domain.DomainEvent
-import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.JsonEventPayloadMapper.InvalidMappingConfigurationException.ConfigurationError._
-import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.JsonEventPayloadMapper.{InvalidMappingConfigurationException, MissingDeserialiserException}
+import com.dreweaster.ddd.jester.domain.{DomainEvent, DomainEventTag}
+import JsonPayloadMapper.InvalidMappingConfigurationException.ConfigurationError._
+import JsonPayloadMapper.{InvalidMappingConfigurationException, MissingDeserialiserException}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import org.scalatest.{FeatureSpec, GivenWhenThen, Matchers}
 
-class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers {
+class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers {
 
   val objectMapper = new ObjectMapper()
 
-  feature("A JsonEventPayloadMapper can deserialise different versions of a conceptual event with a complex com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
+  feature("A JsonPayloadMapper can deserialiseEvent different versions of a conceptual event with a complex com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
 
     val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(
       new EventWithComplexMigrationHistoryMappingConfigurer
     )
 
-    val payloadMapper = new JsonEventPayloadMapper(objectMapper, configurers)
+    val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+
+    val payloadMapper = new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
     scenario("Deserialise a version 1 event") {
       Given("a version 1 payload")
@@ -27,7 +29,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion1Payload,
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName1",
         1).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -46,7 +48,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion2Payload,
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName1",
         2).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -65,7 +67,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion3Payload,
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName1",
         3).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -84,7 +86,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion4Payload,
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName1",
         4).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -103,7 +105,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion5Payload,
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName2",
         5).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -123,7 +125,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion6Payload,
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName2",
         6).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -143,7 +145,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion7Payload,
         "com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName3",
         7).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -163,7 +165,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventVersion8Payload,
         "com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName3",
         8).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -179,7 +181,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
       Then("should throw MissingDeserialiserException")
 
       assertThrows[MissingDeserialiserException] {
-      payloadMapper.deserialise(
+      payloadMapper.deserialiseEvent(
        "{}",
         "com.dreweaster.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName2",
         7).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -187,12 +189,14 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
     }
   }
 
-  feature("A JsonEventPayloadMapper can deserialise multiple conceptual events") {
+  feature("A JsonPayloadMapper can deserialiseEvent multiple conceptual events") {
     val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty()
       .append(new EventWithComplexMigrationHistoryMappingConfigurer).asInstanceOf[javaslang.collection.List[JsonEventMappingConfigurer[_]]]
       .append(new EventWithNoMigrationHistoryMappingConfigurer)
 
-    val payloadMapper = new JsonEventPayloadMapper(objectMapper, configurers)
+    val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+
+    val payloadMapper = new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
     scenario("Deserialises correctly an event that has no com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
       Given("a payload for the event")
@@ -203,7 +207,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventPayload,
         "com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.EventWithNoMigrationHistory",
         1).asInstanceOf[EventWithNoMigrationHistory]
@@ -223,7 +227,7 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
         .toString
 
       When("deserialising the payload")
-      val event = payloadMapper.deserialise(
+      val event = payloadMapper.deserialiseEvent(
         eventPayload,
         "com.dreweaster.ddd.jester.infrastructure.driven.eventstore.mapper.json.EventWithComplexMigrationHistoryClassName3",
         8).asInstanceOf[EventWithComplexMigrationHistoryClassName3]
@@ -235,53 +239,55 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
     }
   }
 
-  feature("A JsonEventPayloadMapper can serialise multiple conceptual events") {
+  feature("A JsonPayloadMapper can serialiseEvent multiple conceptual events") {
 
     val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty()
       .append(new EventWithComplexMigrationHistoryMappingConfigurer).asInstanceOf[javaslang.collection.List[JsonEventMappingConfigurer[_]]]
       .append(new EventWithNoMigrationHistoryMappingConfigurer)
 
-    val payloadMapper = new JsonEventPayloadMapper(objectMapper, configurers)
+    val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+
+    val payloadMapper = new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
     scenario("Serialises correctly an event that has no com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
       When("serialising an event with no com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history")
-      val result = payloadMapper.serialise(new EventWithNoMigrationHistory("joe", "bloggs", true))
+      val result = payloadMapper.serialiseEvent(new EventWithNoMigrationHistory("joe", "bloggs", true))
 
       Then("the event payload should be serialised correctly in JSON")
-      val serialisedPayload = result._1
+      val serialisedPayload = result.payload()
       val payloadAsJson = objectMapper.readTree(serialisedPayload)
       payloadAsJson.get("forename").asText() should be("joe")
       payloadAsJson.get("surname").asText() should be("bloggs")
       payloadAsJson.get("active").asBoolean should be(true)
 
       And("the correct version should be generated")
-      result._2 should be(1)
+      result.version().get() should be(1)
     }
 
     scenario("Serialises correctly an event with com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
       When("serialising an event with com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history")
-      val result = payloadMapper.serialise(new EventWithComplexMigrationHistoryClassName3("joe", "bloggs", true))
+      val result = payloadMapper.serialiseEvent(new EventWithComplexMigrationHistoryClassName3("joe", "bloggs", true))
 
       Then("the event payload should be serialised correctly in JSON")
-      val serialisedPayload = result._1
+      val serialisedPayload = result.payload()
       val payloadAsJson = objectMapper.readTree(serialisedPayload)
       payloadAsJson.get("forename").asText() should be("joe")
       payloadAsJson.get("surname").asText() should be("bloggs")
       payloadAsJson.get("active").asBoolean should be(true)
 
       And("the correct version should be generated")
-      result._2 should be(8)
+      result.version().get() should be(8)
     }
   }
 
-  feature("A JsonEventPayloadMapper rejects competing mapping configurers") {
+  feature("A JsonPayloadMapper rejects competing mapping configurers") {
     // TODO: Complete scenarios for this feature
   }
 
-  feature("A JsonEventPayloadMapper rejects incorrectly configured mapping configurers") {
+  feature("A JsonPayloadMapper rejects incorrectly configured mapping configurers") {
 
-    scenario("Rejects a null serialise function") {
-      Given("a configurer declaring a null serialise function")
+    scenario("Rejects a null serialiseEvent function") {
+      Given("a configurer declaring a null serialiseEvent function")
       val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
         override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
           configurationFactory.create("dummy").mappingFunctions(null, new javaslang.Function1[JsonNode, DummyEvent] {
@@ -292,15 +298,17 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
       val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
 
-      When("creating a JsonEventPayloadMapper using that configurer")
-      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
 
-      Then("the null serialise function should be rejected")
+      When("creating a JsonPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
+
+      Then("the null serialiseEvent function should be rejected")
       thrown.configurationError() should be(SERIALISE_FUNCTION)
     }
 
-    scenario("Rejects a null deserialise function") {
-      Given("a configurer declaring a null deserialise function")
+    scenario("Rejects a null deserialiseEvent function") {
+      Given("a configurer declaring a null deserialiseEvent function")
       val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
         override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
           configurationFactory.create("dummy").mappingFunctions(new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
@@ -311,10 +319,12 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
       val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
 
-      When("creating a JsonEventPayloadMapper using that configurer")
-      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
 
-      Then("the null deserialise function should be rejected")
+      When("creating a JsonPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
+
+      Then("the null deserialiseEvent function should be rejected")
       thrown.configurationError() should be(DESERIALISE_FUNCTION)
     }
 
@@ -328,8 +338,10 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
       val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
 
-      When("creating a JsonEventPayloadMapper using that configurer")
-      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+
+      When("creating a JsonPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
       Then("the null initial class name should be rejected")
       thrown.configurationError() should be(INITIAL_CLASS_NAME)
@@ -355,8 +367,10 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
       val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
 
-      When("creating a JsonEventPayloadMapper using that configurer")
-      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+
+      When("creating a JsonPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
       Then("the null null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration function should be rejected")
       thrown.configurationError() should be(MIGRATION_FUNCTION)
@@ -382,8 +396,10 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
 
       val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
 
-      When("creating a JsonEventPayloadMapper using that configurer")
-      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonEventPayloadMapper(objectMapper, configurers)
+      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+
+      When("creating a JsonPayloadMapper using that configurer")
+      val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
       Then("the null null com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration class name should be rejected")
       thrown.configurationError() should be(MIGRATION_CLASS_NAME)
@@ -391,11 +407,17 @@ class JsonEventPayloadMapperTest extends FeatureSpec with GivenWhenThen with Mat
   }
 }
 
-class DummyEvent(data: String = "") extends DomainEvent
+class DummyEvent(data: String = "") extends DomainEvent {
+  override def tag(): DomainEventTag = DomainEventTag.of("dummy-event")
+}
 
-class EventWithComplexMigrationHistoryClassName3(val forename: String, val surname: String, val active: Boolean) extends DomainEvent
+class EventWithComplexMigrationHistoryClassName3(val forename: String, val surname: String, val active: Boolean) extends DomainEvent {
+  override def tag(): DomainEventTag = DomainEventTag.of("dummy-event")
+}
 
-class EventWithNoMigrationHistory(val forename: String, val surname: String, val active: Boolean) extends DomainEvent
+class EventWithNoMigrationHistory(val forename: String, val surname: String, val active: Boolean) extends DomainEvent {
+  override def tag(): DomainEventTag = DomainEventTag.of("dummy-event")
+}
 
 class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMappingConfigurer[EventWithComplexMigrationHistoryClassName3] {
 

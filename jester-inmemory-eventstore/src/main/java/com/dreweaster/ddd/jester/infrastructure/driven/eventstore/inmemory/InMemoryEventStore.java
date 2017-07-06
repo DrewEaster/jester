@@ -5,42 +5,41 @@ import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.application.eventstore.StreamEvent;
 import com.dreweaster.ddd.jester.domain.*;
 import javaslang.Tuple2;
-import javaslang.collection.HashMap;
 import javaslang.collection.List;
-import javaslang.collection.Map;
 import javaslang.concurrent.Future;
 import javaslang.control.Option;
 
 import java.time.LocalDateTime;
 
-// TODO: Delegate serialisation to an EventPayloadMapper
+// TODO: Delegate serialisation to an PayloadMapper
+// TODO: Is not serialising state
 public class InMemoryEventStore implements EventStore {
 
-    private Map<AggregateType, List> eventStorage = HashMap.empty();
+    private Long nextOffset = 0L;
+
+    private List<Tuple2> events = List.empty();
 
     public void clear() {
-        eventStorage = HashMap.empty();
+        events = List.empty();
     }
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public synchronized <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> loadEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId) {
-
         return Future.successful(persistedEventsFor(aggregateType, aggregateId));
     }
 
     @Override
-    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> loadEvents(
-            AggregateType<A, ?, E, ?> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
-
+    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> loadEvents(
+            AggregateType<A, ?, E, State> aggregateType, AggregateId aggregateId, Long afterSequenceNumber) {
         return Future.successful(persistedEventsFor(aggregateType, aggregateId)
                 .filter(event -> event.sequenceNumber() > afterSequenceNumber));
     }
 
     @Override
-    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
+            AggregateType<A, ?, E, State> aggregateType,
             Integer batchSize) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
         return Future.successful(persistedEvents
@@ -49,8 +48,8 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
-    public <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
+            AggregateType<A, ?, E, State> aggregateType,
             Long afterOffset,
             Integer batchSize) {
         List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
@@ -61,8 +60,13 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public <E extends DomainEvent> Future<List<StreamEvent<?, E>>> loadEventStream(DomainEventTag tag, Long afterOffset, Integer batchSize) {
+        return null;
+    }
+
+    @Override
+    public synchronized <A extends Aggregate<?, E, State>, E extends DomainEvent, State>Future<List<PersistedEvent<A, E>>> saveEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId,
             CausationId causationId,
             List<E> rawEvents,
@@ -71,8 +75,19 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
-    public synchronized <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> saveEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> saveEventsAndState(
+            AggregateType<A, ?, E, State> aggregateType,
+            AggregateId aggregateId,
+            CausationId causationId,
+            List<E> rawEvents,
+            State state,
+            Long expectedSequenceNumber) {
+        return saveEvents(aggregateType, aggregateId, causationId, rawEvents, expectedSequenceNumber);
+    }
+
+    @Override
+    public synchronized <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> saveEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId,
             CausationId causationId,
             CorrelationId correlationId,
@@ -81,9 +96,21 @@ public class InMemoryEventStore implements EventStore {
         return doSaveEvents(aggregateType, aggregateId, causationId, Option.of(correlationId), rawEvents, expectedSequenceNumber);
     }
 
+    @Override
+    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> saveEventsAndState(
+            AggregateType<A, ?, E, State> aggregateType,
+            AggregateId aggregateId,
+            CausationId causationId,
+            CorrelationId correlationId,
+            List<E> rawEvents,
+            State state,
+            Long expectedSequenceNumber) {
+        return saveEvents(aggregateType, aggregateId, causationId, correlationId, rawEvents, expectedSequenceNumber);
+    }
+
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> Future<List<PersistedEvent<A, E>>> doSaveEvents(
-            AggregateType<A, ?, E, ?> aggregateType,
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<PersistedEvent<A, E>>> doSaveEvents(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId,
             CausationId causationId,
             Option<CorrelationId> correlationId,
@@ -107,32 +134,43 @@ public class InMemoryEventStore implements EventStore {
                                         acc._1
                                 ))))._2;
 
-        eventStorage = eventStorage.put(aggregateType, eventStorage.get(aggregateType)
-                .getOrElse(List.empty())
-                .appendAll(persistedEvents));
+        persistedEvents.forEach( event -> {
+            events = events.append(new Tuple2(event,nextOffset));
+            nextOffset = nextOffset + 1;
+        });
 
         return Future.successful(persistedEvents);
     }
 
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
-            AggregateType<A, ?, E, ?> aggregateType) {
-        return eventStorage.get(aggregateType).getOrElse(List.empty());
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<PersistedEvent<A, E>> persistedEventsFor(
+            AggregateType<A, ?, E, State> aggregateType) {
+        return events.filter( e -> {
+            Tuple2<PersistedEvent<A, E>, Long> event = ((Tuple2<PersistedEvent<A, E>, Long>) e);
+            return event._1.aggregateType().equals(aggregateType);
+        }).map( event ->(PersistedEvent<A, E>) event._1);
     }
 
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> List<PersistedEvent<A, E>> persistedEventsFor(
-            AggregateType<A, ?, E, ?> aggregateType,
-            AggregateId aggregateId) {
-
-        return eventStorage.get(aggregateType)
-                .map(aggregateEvents -> aggregateEvents
-                        .filter(e -> ((PersistedEvent<A, E>) e).aggregateId().equals(aggregateId)))
-                .getOrElse(List.empty());
+    private <E extends DomainEvent> List<PersistedEvent<?,E>> persistedEventsFor(DomainEventTag tag) {
+        return events.filter( e -> {
+            Tuple2<PersistedEvent<?, E>, Long> event = ((Tuple2<PersistedEvent<?, E>, Long>) e);
+            return event._1.rawEvent().tag().equals(tag);
+        }).map( event ->(PersistedEvent<?, E>) event._1);
     }
 
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> boolean aggregateHasBeenModified(
-            AggregateType<A, ?, E, ?> aggregateType,
+    @SuppressWarnings("unchecked")
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<PersistedEvent<A, E>> persistedEventsFor(
+            AggregateType<A, ?, E, State> aggregateType,
+            AggregateId aggregateId) {
+        return events.filter( e -> {
+            Tuple2<PersistedEvent<A, E>, Long> event = ((Tuple2<PersistedEvent<A, E>, Long>) e);
+            return event._1.aggregateType().equals(aggregateType) && event._1.aggregateId().equals(aggregateId);
+        }).map( event ->(PersistedEvent<A, E>) event._1);
+    }
+
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> boolean aggregateHasBeenModified(
+            AggregateType<A, ?, E, State> aggregateType,
             AggregateId aggregateId,
             Long expectedSequenceNumber) {
 
@@ -142,12 +180,12 @@ public class InMemoryEventStore implements EventStore {
                 .getOrElse(false);
     }
 
-    private <A extends Aggregate<?, E, ?>, E extends DomainEvent> StreamEvent<A, E> streamEventOf(
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> StreamEvent<A, E> streamEventOf(
             PersistedEvent<A, E> persistedEvent, long offset) {
         return new SimpleStreamEvent<>(persistedEvent, offset);
     }
 
-    private class SimpleStreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> implements StreamEvent<A, E> {
+    private class SimpleStreamEvent<A extends Aggregate<?, E, State>, E extends DomainEvent, State> implements StreamEvent<A, E> {
 
         private PersistedEvent<A, E> persistedEvent;
 
@@ -200,7 +238,7 @@ public class InMemoryEventStore implements EventStore {
 
         @Override
         public Integer eventVersion() {
-            return 1; // TODO: Implement EventPayloadMapper integration
+            return 1; // TODO: Implement PayloadMapper integration
         }
 
         @Override
@@ -285,7 +323,7 @@ public class InMemoryEventStore implements EventStore {
 
         @Override
         public Integer eventVersion() {
-            return 1; // TODO: Implement EventPayloadMapper integration
+            return 1; // TODO: Implement PayloadMapper integration
         }
 
         @Override

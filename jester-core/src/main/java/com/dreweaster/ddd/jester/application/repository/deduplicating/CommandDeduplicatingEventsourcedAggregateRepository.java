@@ -3,6 +3,7 @@ package com.dreweaster.ddd.jester.application.repository.deduplicating;
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.domain.*;
+import javaslang.Tuple2;
 import javaslang.Tuple3;
 import javaslang.collection.List;
 import javaslang.concurrent.Future;
@@ -83,21 +84,24 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 if (!deduplicationStrategy.isDuplicate(wrapper.commandEnvelope.commandId())) {
                     final Long finalExpectedSequenceNumber = tuple._1;
 
+                    // TODO: Allow state serialisation to be configurable
                     return wrapper.commandEnvelope().correlationId().map(correlationId ->
-                                    aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEvents ->
-                                            eventStore.saveEvents(
+                                    aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEventsAndState ->
+                                            eventStore.saveEventsAndState(
                                                     aggregateType,
                                                     wrapper.aggregateId(),
                                                     CausationId.of(wrapper.commandEnvelope().commandId().get()),
                                                     correlationId,
-                                                    generatedEvents,
+                                                    generatedEventsAndState._1,
+                                                    generatedEventsAndState._2,
                                                     finalExpectedSequenceNumber))
-                    ).getOrElse(aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEvents ->
-                            eventStore.saveEvents(
+                    ).getOrElse(aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEventsAndState ->
+                            eventStore.saveEventsAndState(
                                     aggregateType,
                                     wrapper.aggregateId(),
                                     CausationId.of(wrapper.commandEnvelope().commandId().get()),
-                                    generatedEvents,
+                                    generatedEventsAndState._1,
+                                    generatedEventsAndState._2,
                                     finalExpectedSequenceNumber)));
                 } else {
                     // TODO: We should capture metrics about duplicated commands
@@ -153,8 +157,8 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             return promise.future();
         }
 
-        public Future<List<E>> handle(C command) {
-            Promise<List<E>> promise = Promise.make();
+        public Future<Tuple2<List<E>,State>> handle(C command) {
+            Promise<Tuple2<List<E>,State>> promise = Promise.make();
 
             try {
                 A aggregateInstance = aggregateType.clazz().newInstance();
@@ -168,7 +172,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                         promise.failure(maybeBehaviour.getLeft());
                         return promise.future();
                     }
-                    behaviour = behaviour.handleEvent(event).get();
+                    behaviour = behaviour.handleEvent(event).get(); // FIXME: Calling get()
                 }
 
                 final Behaviour<C, E, State> finalBehaviour = behaviour;
@@ -186,7 +190,15 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                     }
                 });
 
-                handled.bimap(promise::failure, promise::success);
+                handled.bimap(promise::failure, eventsList -> {
+                    // FIXME: Not working!
+                    // Apply events to get latest state for potential serialisation
+                    Behaviour<C, E, State> updatedBehaviour = eventsList.foldLeft(
+                            finalBehaviour,
+                            (acc,event) -> acc.handleEvent(event).get()); // FIXME: Calling get()
+
+                    return promise.success(new Tuple2<>(eventsList, updatedBehaviour.state()));
+                });
 
             } catch (Exception ex) {
                 // TODO: Do we need to handle this more specifically? Caused by aggregate instance creation failure

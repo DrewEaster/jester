@@ -26,8 +26,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>9.4.1209</version>
-            <scope>runtime</scope>
+            <version>9.4.1212</version>
         </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>
