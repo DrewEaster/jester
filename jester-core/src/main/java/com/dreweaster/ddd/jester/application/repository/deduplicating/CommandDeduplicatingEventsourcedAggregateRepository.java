@@ -191,11 +191,10 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 });
 
                 handled.bimap(promise::failure, eventsList -> {
-                    // FIXME: Not working!
                     // Apply events to get latest state for potential serialisation
                     Behaviour<C, E, State> updatedBehaviour = eventsList.foldLeft(
                             finalBehaviour,
-                            (acc,event) -> acc.handleEvent(event).get()); // FIXME: Calling get()
+                            (acc,event) -> acc.handleEvent(event).getOrElseThrow(this::throwableToRuntimeException));
 
                     return promise.success(new Tuple2<>(eventsList, updatedBehaviour.state()));
                 });
@@ -206,6 +205,14 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             }
 
             return promise.future();
+        }
+
+        private RuntimeException throwableToRuntimeException(Throwable throwable) {
+            if(throwable instanceof RuntimeException) {
+                return (RuntimeException)throwable;
+            } else {
+                return new RuntimeException(throwable);
+            }
         }
     }
 

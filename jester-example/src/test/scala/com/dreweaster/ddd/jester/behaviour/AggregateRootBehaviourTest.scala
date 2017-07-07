@@ -286,7 +286,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     futureEvents.getCause.get shouldBe an[NoHandlerForCommand]
   }
 
-  it should "generate an error during recovery when encountering an event not supported in its current behaviour" in {
+  it should "generate an error when handling a command for which there is no corresponding event supported in its current behaviour" in {
     Given("an aggregate with a missing event handler")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
     await(user.handle(
@@ -297,26 +297,18 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .password("password")
           .create())))
 
-    And("the unhandled event has been persisted")
-    await(user.handle(
+    When("Sending a command that has no corresponding event handler")
+    val futureEvents = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_other_command_id"),
         ChangeUsername.builder()
           .username("johnsmith")
           .create())))
 
-    When("sending a command")
-    val futureEvents = await(user.handle(
-      CommandEnvelope.of(
-        CommandId.of("yet_another_command_id"),
-        ChangePassword.builder()
-          .password("newPassword")
-          .create())))
-
     Then("the command should fail")
     futureEvents.isSuccess should be(false)
 
-    And("the unhandled command error should be returned")
+    And("the no handler for event error should be returned")
     futureEvents.getCause.get shouldBe an[NoHandlerForEvent]
   }
 
