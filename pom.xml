@@ -18,7 +18,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scalaVersion>2.11.8</scalaVersion>
+        <scala.version>2.11.8</scala.version>
         <bintray.subject>dreweaster</bintray.subject>
         <bintray.repo>projects</bintray.repo>
         <bintray.package>jester</bintray.package>
@@ -71,7 +71,7 @@
             <dependency>
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-library</artifactId>
-                <version>${scalaVersion}</version>
+                <version>${scala.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
