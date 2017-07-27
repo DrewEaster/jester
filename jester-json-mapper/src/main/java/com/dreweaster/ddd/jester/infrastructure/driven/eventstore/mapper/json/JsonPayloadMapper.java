@@ -7,12 +7,12 @@ import com.dreweaster.ddd.jester.domain.DomainEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import javaslang.Function1;
-import javaslang.Function2;
-import javaslang.Tuple2;
-import javaslang.collection.HashMap;
-import javaslang.collection.List;
-import javaslang.collection.Map;
+import io.vavr.Function1;
+import io.vavr.Function2;
+import io.vavr.Tuple2;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.List;
+import io.vavr.collection.Map;
 
 import java.io.IOException;
 import java.util.function.Function;

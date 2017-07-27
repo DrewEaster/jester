@@ -1,7 +1,7 @@
 package com.dreweaster.ddd.jester.domain;
 
-import javaslang.collection.List;
-import javaslang.control.Either;
+import io.vavr.collection.List;
+import io.vavr.control.Either;
 
 public interface CommandContext<E extends DomainEvent, State> {
 

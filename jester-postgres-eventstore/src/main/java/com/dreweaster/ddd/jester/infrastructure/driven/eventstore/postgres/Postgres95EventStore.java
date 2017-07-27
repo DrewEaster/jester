@@ -3,10 +3,10 @@ package com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres;
 import com.dreweaster.ddd.jester.application.eventstore.*;
 import com.dreweaster.ddd.jester.application.eventstore.PayloadMapper.PayloadSerialisationResult;
 import com.dreweaster.ddd.jester.domain.*;
-import javaslang.Tuple2;
-import javaslang.collection.List;
-import javaslang.concurrent.Future;
-import javaslang.control.Option;
+import io.vavr.Tuple2;
+import io.vavr.collection.List;
+import io.vavr.concurrent.Future;
+import io.vavr.control.Option;
 import org.postgresql.util.PGobject;
 
 import javax.sql.DataSource;

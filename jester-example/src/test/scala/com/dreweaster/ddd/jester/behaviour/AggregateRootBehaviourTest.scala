@@ -1,9 +1,9 @@
 package com.dreweaster.ddd.jester.behaviour
 
 import java.util.Optional
-import javaslang.concurrent.Future
-import javaslang.control
-import javaslang.control.Option
+import io.vavr.concurrent.Future
+import io.vavr.control
+import io.vavr.control.Option
 import javax.tools.OptionChecker
 
 import com.dreweaster.ddd.jester.application.eventstore.EventStore.OptimisticConcurrencyException

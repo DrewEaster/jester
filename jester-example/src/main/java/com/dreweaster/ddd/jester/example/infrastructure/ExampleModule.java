@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.AbstractModule;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import javaslang.collection.List;
+import io.vavr.collection.List;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

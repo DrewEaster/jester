@@ -1,8 +1,8 @@
 package com.dreweaster.ddd.jester.domain;
 
-import javaslang.collection.HashMap;
-import javaslang.collection.List;
-import javaslang.collection.Map;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.List;
+import io.vavr.collection.Map;
 
 public interface DomainModel {
 

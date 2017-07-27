@@ -5,7 +5,7 @@ import com.dreweaster.ddd.jester.domain.AggregateRepository;
 import com.dreweaster.ddd.jester.domain.CommandId;
 import com.dreweaster.ddd.jester.example.application.service.UserService;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.repository.UserRepository;
-import javaslang.concurrent.Future;
+import io.vavr.concurrent.Future;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.RegisterUser;
 
 import javax.inject.Inject;

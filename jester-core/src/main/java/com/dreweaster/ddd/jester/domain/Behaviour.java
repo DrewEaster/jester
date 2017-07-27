@@ -2,11 +2,11 @@ package com.dreweaster.ddd.jester.domain;
 
 import com.dreweaster.ddd.jester.domain.AggregateRepository.AggregateRoot.NoHandlerForCommand;
 import com.dreweaster.ddd.jester.domain.AggregateRepository.AggregateRoot.NoHandlerForEvent;
-import javaslang.Function2;
-import javaslang.collection.HashMap;
-import javaslang.collection.List;
-import javaslang.collection.Map;
-import javaslang.control.Either;
+import io.vavr.Function2;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.List;
+import io.vavr.collection.Map;
+import io.vavr.control.Either;
 
 public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
 

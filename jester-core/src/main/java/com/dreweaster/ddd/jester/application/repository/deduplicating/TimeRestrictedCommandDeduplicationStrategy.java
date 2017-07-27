@@ -3,8 +3,8 @@ package com.dreweaster.ddd.jester.application.repository.deduplicating;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.domain.CausationId;
 import com.dreweaster.ddd.jester.domain.CommandId;
-import javaslang.collection.HashSet;
-import javaslang.collection.Set;
+import io.vavr.collection.HashSet;
+import io.vavr.collection.Set;
 
 import java.time.LocalDateTime;
 

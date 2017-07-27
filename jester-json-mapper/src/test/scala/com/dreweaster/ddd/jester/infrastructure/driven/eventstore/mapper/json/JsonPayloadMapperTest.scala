@@ -13,11 +13,11 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
 
   feature("A JsonPayloadMapper can deserialiseEvent different versions of a conceptual event with a complex com.dreweaster.ddd.jester.infrastructure.driven.eventstore.com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres.db.migration history") {
 
-    val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(
+    val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty().append(
       new EventWithComplexMigrationHistoryMappingConfigurer
     )
 
-    val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+    val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
     val payloadMapper = new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
@@ -190,11 +190,11 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
   }
 
   feature("A JsonPayloadMapper can deserialiseEvent multiple conceptual events") {
-    val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty()
-      .append(new EventWithComplexMigrationHistoryMappingConfigurer).asInstanceOf[javaslang.collection.List[JsonEventMappingConfigurer[_]]]
+    val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty()
+      .append(new EventWithComplexMigrationHistoryMappingConfigurer).asInstanceOf[io.vavr.collection.List[JsonEventMappingConfigurer[_]]]
       .append(new EventWithNoMigrationHistoryMappingConfigurer)
 
-    val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+    val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
     val payloadMapper = new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
@@ -241,11 +241,11 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
 
   feature("A JsonPayloadMapper can serialiseEvent multiple conceptual events") {
 
-    val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty()
-      .append(new EventWithComplexMigrationHistoryMappingConfigurer).asInstanceOf[javaslang.collection.List[JsonEventMappingConfigurer[_]]]
+    val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty()
+      .append(new EventWithComplexMigrationHistoryMappingConfigurer).asInstanceOf[io.vavr.collection.List[JsonEventMappingConfigurer[_]]]
       .append(new EventWithNoMigrationHistoryMappingConfigurer)
 
-    val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+    val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
     val payloadMapper = new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
 
@@ -290,15 +290,15 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
       Given("a configurer declaring a null serialiseEvent function")
       val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
         override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
-          configurationFactory.create("dummy").mappingFunctions(null, new javaslang.Function1[JsonNode, DummyEvent] {
+          configurationFactory.create("dummy").mappingFunctions(null, new io.vavr.Function1[JsonNode, DummyEvent] {
             override def apply(t1: JsonNode): DummyEvent = new DummyEvent()
           })
         }
       }
 
-      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+      val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty().append(configurer)
 
-      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+      val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
       When("creating a JsonPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
@@ -311,15 +311,15 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
       Given("a configurer declaring a null deserialiseEvent function")
       val configurer: JsonEventMappingConfigurer[_] = new JsonEventMappingConfigurer[DummyEvent] {
         override def configure(configurationFactory: JsonEventMappingConfigurationFactory[DummyEvent]): Unit = {
-          configurationFactory.create("dummy").mappingFunctions(new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
+          configurationFactory.create("dummy").mappingFunctions(new io.vavr.Function2[DummyEvent, ObjectNode, JsonNode] {
             override def apply(t1: DummyEvent, t2: ObjectNode): JsonNode = t2
           }, null)
         }
       }
 
-      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+      val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty().append(configurer)
 
-      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+      val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
       When("creating a JsonPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
@@ -336,9 +336,9 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
         }
       }
 
-      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+      val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty().append(configurer)
 
-      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+      val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
       When("creating a JsonPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
@@ -355,19 +355,19 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
             .create("dummy")
             .migrateFormat(null)
             .mappingFunctions(
-              new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
+              new io.vavr.Function2[DummyEvent, ObjectNode, JsonNode] {
                 override def apply(t1: DummyEvent, t2: ObjectNode): JsonNode = t2
               },
-              new javaslang.Function1[JsonNode, DummyEvent] {
+              new io.vavr.Function1[JsonNode, DummyEvent] {
                 override def apply(t1: JsonNode): DummyEvent = new DummyEvent()
               }
             )
         }
       }
 
-      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+      val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty().append(configurer)
 
-      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+      val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
       When("creating a JsonPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
@@ -384,19 +384,19 @@ class JsonPayloadMapperTest extends FeatureSpec with GivenWhenThen with Matchers
             .create("dummy")
             .migrateClassName(null)
             .mappingFunctions(
-              new javaslang.Function2[DummyEvent, ObjectNode, JsonNode] {
+              new io.vavr.Function2[DummyEvent, ObjectNode, JsonNode] {
                 override def apply(t1: DummyEvent, t2: ObjectNode): JsonNode = t2
               },
-              new javaslang.Function1[JsonNode, DummyEvent] {
+              new io.vavr.Function1[JsonNode, DummyEvent] {
                 override def apply(t1: JsonNode): DummyEvent = new DummyEvent()
               }
             )
         }
       }
 
-      val configurers: javaslang.collection.List[JsonEventMappingConfigurer[_]] = javaslang.collection.List.empty().append(configurer)
+      val configurers: io.vavr.collection.List[JsonEventMappingConfigurer[_]] = io.vavr.collection.List.empty().append(configurer)
 
-      val stateSerialisers: javaslang.collection.List[StatePayloadJsonSerialiser[_,_]] = javaslang.collection.List.empty()
+      val stateSerialisers: io.vavr.collection.List[StatePayloadJsonSerialiser[_,_]] = io.vavr.collection.List.empty()
 
       When("creating a JsonPayloadMapper using that configurer")
       val thrown = the[InvalidMappingConfigurationException] thrownBy new JsonPayloadMapper(objectMapper, configurers, stateSerialisers)
@@ -433,8 +433,8 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
       .mappingFunctions(serialise, deserialise)
   }
 
-  val serialise: javaslang.Function2[EventWithComplexMigrationHistoryClassName3, ObjectNode, JsonNode] =
-    new javaslang.Function2[EventWithComplexMigrationHistoryClassName3, ObjectNode, JsonNode] {
+  val serialise: io.vavr.Function2[EventWithComplexMigrationHistoryClassName3, ObjectNode, JsonNode] =
+    new io.vavr.Function2[EventWithComplexMigrationHistoryClassName3, ObjectNode, JsonNode] {
       override def apply(event: EventWithComplexMigrationHistoryClassName3, root: ObjectNode): JsonNode = {
         root
           .put("forename", event.forename)
@@ -443,7 +443,7 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
       }
     }
 
-  val deserialise: javaslang.Function1[JsonNode, EventWithComplexMigrationHistoryClassName3] = new javaslang.Function1[JsonNode, EventWithComplexMigrationHistoryClassName3] {
+  val deserialise: io.vavr.Function1[JsonNode, EventWithComplexMigrationHistoryClassName3] = new io.vavr.Function1[JsonNode, EventWithComplexMigrationHistoryClassName3] {
     override def apply(root: JsonNode): EventWithComplexMigrationHistoryClassName3 =
       new EventWithComplexMigrationHistoryClassName3(
         forename = root.get("forename").asText,
@@ -451,7 +451,7 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
         active = root.get("active").asBoolean())
   }
 
-  val migrateVersion1ToVersion2: javaslang.Function1[JsonNode, JsonNode] = new javaslang.Function1[JsonNode, JsonNode] {
+  val migrateVersion1ToVersion2: io.vavr.Function1[JsonNode, JsonNode] = new io.vavr.Function1[JsonNode, JsonNode] {
     override def apply(node: JsonNode): JsonNode = {
       val firstName = node.get("firstName").asText()
       val secondName = node.get("secondName").asText()
@@ -462,7 +462,7 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
     }
   }
 
-  val migrateVersion2ToVersion3: javaslang.Function1[JsonNode, JsonNode] = new javaslang.Function1[JsonNode, JsonNode] {
+  val migrateVersion2ToVersion3: io.vavr.Function1[JsonNode, JsonNode] = new io.vavr.Function1[JsonNode, JsonNode] {
     override def apply(node: JsonNode): JsonNode = {
       val secondName = node.get("second_name").asText()
       node.asInstanceOf[ObjectNode].remove("second_name")
@@ -470,7 +470,7 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
     }
   }
 
-  val migrateVersion3ToVersion4: javaslang.Function1[JsonNode, JsonNode] = new javaslang.Function1[JsonNode, JsonNode] {
+  val migrateVersion3ToVersion4: io.vavr.Function1[JsonNode, JsonNode] = new io.vavr.Function1[JsonNode, JsonNode] {
     override def apply(node: JsonNode): JsonNode = {
       val firstName = node.get("first_name").asText()
       val lastName = node.get("last_name").asText()
@@ -480,14 +480,14 @@ class EventWithComplexMigrationHistoryMappingConfigurer extends JsonEventMapping
     }
   }
 
-  val migrateVersion4ToVersion6: javaslang.Function1[JsonNode, JsonNode] = new javaslang.Function1[JsonNode, JsonNode] {
+  val migrateVersion4ToVersion6: io.vavr.Function1[JsonNode, JsonNode] = new io.vavr.Function1[JsonNode, JsonNode] {
     override def apply(node: JsonNode): JsonNode = {
       node.asInstanceOf[ObjectNode]
         .put("activated", true)
     }
   }
 
-  val migrateVersion6ToVersion8: javaslang.Function1[JsonNode, JsonNode] = new javaslang.Function1[JsonNode, JsonNode] {
+  val migrateVersion6ToVersion8: io.vavr.Function1[JsonNode, JsonNode] = new io.vavr.Function1[JsonNode, JsonNode] {
     override def apply(node: JsonNode): JsonNode = {
       val activated = node.get("activated").asBoolean()
       node.asInstanceOf[ObjectNode].remove("activated")
@@ -503,8 +503,8 @@ class EventWithNoMigrationHistoryMappingConfigurer extends JsonEventMappingConfi
       .mappingFunctions(serialise, deserialise)
   }
 
-  val serialise: javaslang.Function2[EventWithNoMigrationHistory, ObjectNode, JsonNode] =
-    new javaslang.Function2[EventWithNoMigrationHistory, ObjectNode, JsonNode] {
+  val serialise: io.vavr.Function2[EventWithNoMigrationHistory, ObjectNode, JsonNode] =
+    new io.vavr.Function2[EventWithNoMigrationHistory, ObjectNode, JsonNode] {
       override def apply(event: EventWithNoMigrationHistory, root: ObjectNode): JsonNode = {
         root
           .put("forename", event.forename)
@@ -513,7 +513,7 @@ class EventWithNoMigrationHistoryMappingConfigurer extends JsonEventMappingConfi
       }
     }
 
-  val deserialise: javaslang.Function1[JsonNode, EventWithNoMigrationHistory] = new javaslang.Function1[JsonNode, EventWithNoMigrationHistory] {
+  val deserialise: io.vavr.Function1[JsonNode, EventWithNoMigrationHistory] = new io.vavr.Function1[JsonNode, EventWithNoMigrationHistory] {
     override def apply(root: JsonNode): EventWithNoMigrationHistory =
       new EventWithNoMigrationHistory(
         forename = root.get("forename").asText,

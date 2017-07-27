@@ -3,12 +3,13 @@ package com.dreweaster.ddd.jester.application.repository.deduplicating;
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.domain.*;
-import javaslang.Tuple2;
-import javaslang.Tuple3;
-import javaslang.collection.List;
-import javaslang.concurrent.Future;
-import javaslang.concurrent.Promise;
-import javaslang.control.Either;
+
+import io.vavr.Tuple2;
+import io.vavr.Tuple3;
+import io.vavr.collection.List;
+import io.vavr.concurrent.Future;
+import io.vavr.concurrent.Promise;
+import io.vavr.control.Either;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

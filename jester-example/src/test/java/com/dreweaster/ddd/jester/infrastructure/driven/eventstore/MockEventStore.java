@@ -3,9 +3,9 @@ package com.dreweaster.ddd.jester.infrastructure.driven.eventstore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.domain.*;
 import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.inmemory.InMemoryEventStore;
-import javaslang.collection.List;
-import javaslang.concurrent.Future;
-import javaslang.concurrent.Promise;
+import io.vavr.collection.List;
+import io.vavr.concurrent.Future;
+import io.vavr.concurrent.Promise;
 
 public class MockEventStore extends InMemoryEventStore {
 

@@ -4,10 +4,10 @@ import com.dreweaster.ddd.jester.application.eventstore.EventStore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.application.eventstore.StreamEvent;
 import com.dreweaster.ddd.jester.domain.*;
-import javaslang.Tuple2;
-import javaslang.collection.List;
-import javaslang.concurrent.Future;
-import javaslang.control.Option;
+import io.vavr.Tuple2;
+import io.vavr.collection.List;
+import io.vavr.concurrent.Future;
+import io.vavr.control.Option;
 
 import java.time.LocalDateTime;
 

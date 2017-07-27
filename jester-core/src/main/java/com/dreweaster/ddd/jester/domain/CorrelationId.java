@@ -1,6 +1,6 @@
 package com.dreweaster.ddd.jester.domain;
 
-import javaslang.control.Option;
+import io.vavr.control.Option;
 
 /**
  */

@@ -1,8 +1,8 @@
 package com.dreweaster.ddd.jester.domain;
 
-import javaslang.collection.List;
-import javaslang.concurrent.Future;
-import javaslang.control.Option;
+import io.vavr.collection.List;
+import io.vavr.concurrent.Future;
+import io.vavr.control.Option;
 
 import java.util.Optional;
 

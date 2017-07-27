@@ -2,7 +2,7 @@ package com.dreweaster.ddd.jester.application.eventstore;
 
 import com.dreweaster.ddd.jester.domain.Aggregate;
 import com.dreweaster.ddd.jester.domain.DomainEvent;
-import javaslang.control.Option;
+import io.vavr.control.Option;
 
 public interface PayloadMapper {
 
