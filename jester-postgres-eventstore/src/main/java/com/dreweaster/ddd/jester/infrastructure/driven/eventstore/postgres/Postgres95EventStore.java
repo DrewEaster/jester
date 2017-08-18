@@ -362,7 +362,7 @@ public class Postgres95EventStore implements EventStore {
                 "INSERT INTO aggregate_root (aggregate_id,aggregate_type,aggregate_version,aggregate_state) " +
                 "VALUES (?,?,?,?) " +
                 "ON CONFLICT ON CONSTRAINT aggregate_root_pkey " +
-                "DO UPDATE SET aggregate_version = ? WHERE aggregate_root.aggregate_version = ?");
+                "DO UPDATE SET aggregate_version = ?, aggregate_state = ? WHERE aggregate_root.aggregate_version = ?");
 
         statement.setString(1, aggregateId.get());
         statement.setString(2, aggregateType.name());
@@ -375,7 +375,8 @@ public class Postgres95EventStore implements EventStore {
         statement.setObject(4, jsonObject);
 
         statement.setLong(5, newVersion);
-        statement.setLong(6, expectedPreviousVersion);
+        statement.setObject(6, jsonObject); // need to set state twice for use in either INSERT INTO or DO UPDATE
+        statement.setLong(7, expectedPreviousVersion);
 
         return statement;
     }
