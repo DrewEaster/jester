@@ -1,11 +1,32 @@
 package com.dreweaster.ddd.jester.application.eventstore;
 
-import com.dreweaster.ddd.jester.domain.Aggregate;
-import com.dreweaster.ddd.jester.domain.DomainEvent;
+import io.vavr.control.Option;
 
-/**
- */
-public interface StreamEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent> extends PersistedEvent<A, E> {
+import java.time.LocalDateTime;
+
+public interface StreamEvent {
 
     Long offset();
+
+    String id();
+
+    String aggregateType();
+
+    String aggregateId();
+
+    String causationId();
+
+    Option<String> correlationId();
+
+    String eventType();
+
+    String eventTag();
+
+    LocalDateTime timestamp();
+
+    Long sequenceNumber();
+
+    String serialisedPayload();
+
+    SerialisationContentType payloadContentType();
 }

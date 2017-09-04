@@ -2,6 +2,7 @@ package com.dreweaster.ddd.jester.infrastructure.driven.eventstore.inmemory;
 
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
+import com.dreweaster.ddd.jester.application.eventstore.SerialisationContentType;
 import com.dreweaster.ddd.jester.application.eventstore.StreamEvent;
 import com.dreweaster.ddd.jester.domain.*;
 import io.vavr.Tuple2;
@@ -38,29 +39,7 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
-    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, State> aggregateType,
-            Integer batchSize) {
-        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
-        return Future.successful(persistedEvents
-                .map(event -> streamEventOf(event, persistedEvents.indexOf(event)))
-                .take(batchSize));
-    }
-
-    @Override
-    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, State> aggregateType,
-            Long afterOffset,
-            Integer batchSize) {
-        List<PersistedEvent<A, E>> persistedEvents = persistedEventsFor(aggregateType);
-        return Future.successful(persistedEvents
-                .map(event -> streamEventOf(event, persistedEvents.indexOf(event)))
-                .filter(event -> event.offset() > afterOffset)
-                .take(batchSize));
-    }
-
-    @Override
-    public <E extends DomainEvent> Future<List<StreamEvent<?, E>>> loadEventStream(DomainEventTag tag, Long afterOffset, Integer batchSize) {
+    public <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(DomainEventTag tag, Long afterOffset, Integer batchSize) {
         return null;
     }
 
@@ -180,12 +159,12 @@ public class InMemoryEventStore implements EventStore {
                 .getOrElse(false);
     }
 
-    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> StreamEvent<A, E> streamEventOf(
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> StreamEvent streamEventOf(
             PersistedEvent<A, E> persistedEvent, long offset) {
         return new SimpleStreamEvent<>(persistedEvent, offset);
     }
 
-    private class SimpleStreamEvent<A extends Aggregate<?, E, State>, E extends DomainEvent, State> implements StreamEvent<A, E> {
+    private class SimpleStreamEvent<A extends Aggregate<?, E, State>, E extends DomainEvent, State> implements StreamEvent {
 
         private PersistedEvent<A, E> persistedEvent;
 
@@ -197,48 +176,43 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public EventId id() {
-            return persistedEvent.id();
-        }
-
-        @Override
         public Long offset() {
             return offset;
         }
 
         @Override
-        public AggregateType<A, ?, E, ?> aggregateType() {
-            return persistedEvent.aggregateType();
+        public String id() {
+            return persistedEvent.id().get();
         }
 
         @Override
-        public AggregateId aggregateId() {
-            return persistedEvent.aggregateId();
+        public String aggregateType() {
+            return persistedEvent.aggregateType().name();
         }
 
         @Override
-        public CausationId causationId() {
-            return persistedEvent.causationId();
+        public String aggregateId() {
+            return persistedEvent.aggregateId().get();
         }
 
         @Override
-        public Option<CorrelationId> correlationId() {
-            return persistedEvent.correlationId();
+        public String causationId() {
+            return persistedEvent.causationId().get();
         }
 
         @Override
-        public E rawEvent() {
-            return persistedEvent.rawEvent();
+        public Option<String> correlationId() {
+            return persistedEvent.correlationId().map(CorrelationId::get);
         }
 
         @Override
-        public Class<E> eventType() {
-            return persistedEvent.eventType();
+        public String eventType() {
+            return persistedEvent.eventType().getName();
         }
 
         @Override
-        public Integer eventVersion() {
-            return 1; // TODO: Implement PayloadMapper integration
+        public String eventTag() {
+            return persistedEvent.rawEvent().tag().tag();
         }
 
         @Override
@@ -249,6 +223,16 @@ public class InMemoryEventStore implements EventStore {
         @Override
         public Long sequenceNumber() {
             return persistedEvent.sequenceNumber();
+        }
+
+        @Override
+        public String serialisedPayload() {
+            return "{}";
+        }
+
+        @Override
+        public SerialisationContentType payloadContentType() {
+            return SerialisationContentType.JSON;
         }
     }
 

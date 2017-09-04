@@ -55,30 +55,7 @@ public class Postgres95EventStore implements EventStore {
     }
 
     @Override
-    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, State> aggregateType,
-            Integer batchSize) {
-
-        return Future.of(executorService, () -> loadEventsForAggregateType(
-                aggregateType,
-                Option.none(),
-                batchSize));
-    }
-
-    @Override
-    public <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, State> aggregateType,
-            Long afterOffset,
-            Integer batchSize) {
-
-        return Future.of(executorService, () -> loadEventsForAggregateType(
-                aggregateType,
-                Option.of(afterOffset),
-                batchSize));
-    }
-
-    @Override
-    public <E extends DomainEvent> Future<List<StreamEvent<?, E>>> loadEventStream(DomainEventTag tag, Long afterOffset, Integer batchSize) {
+    public <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(DomainEventTag tag, Long afterOffset, Integer batchSize) {
         return Future.of(executorService, () -> loadEventsForTag(
                 tag,
                 Option.of(afterOffset),
@@ -179,6 +156,7 @@ public class Postgres95EventStore implements EventStore {
 
                     return new Tuple2<>(acc._1 + 1, acc._2.append(
                             new PostgresEvent<>(
+                                    null,
                                     EventId.createUnique(),
                                     aggregateId,
                                     aggregateType,
@@ -237,7 +215,7 @@ public class Postgres95EventStore implements EventStore {
     }
 
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<StreamEvent<A, E>> loadEventsForAggregateType(
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<StreamEvent> loadEventsForAggregateType(
             AggregateType<A, ?, E, ?> aggregateType,
             Option<Long> afterOffset,
             Integer batchSize) throws SQLException, ClassNotFoundException {
@@ -246,10 +224,10 @@ public class Postgres95EventStore implements EventStore {
              PreparedStatement ps = createEventsForAggregateTypePreparedStatement(con, aggregateType, afterOffset, batchSize);
              ResultSet rs = ps.executeQuery()) {
 
-            ArrayList<StreamEvent<A, E>> persistedEvents = new ArrayList<>();
+            ArrayList<StreamEvent> persistedEvents = new ArrayList<>();
 
             while (rs.next()) {
-                persistedEvents.add(resultSetToPersistedEvent(rs));
+                persistedEvents.add(resultSetToPersistedEvent(rs).toStreamEvent());
             }
 
             return List.ofAll(persistedEvents);
@@ -257,7 +235,7 @@ public class Postgres95EventStore implements EventStore {
     }
 
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<StreamEvent<?, E>> loadEventsForTag(
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<StreamEvent> loadEventsForTag(
             DomainEventTag tag,
             Option<Long> afterOffset,
             Integer batchSize) throws SQLException, ClassNotFoundException {
@@ -266,10 +244,10 @@ public class Postgres95EventStore implements EventStore {
              PreparedStatement ps = createEventsForTagPreparedStatement(con, tag, afterOffset, batchSize);
              ResultSet rs = ps.executeQuery()) {
 
-            ArrayList<StreamEvent<A, E>> persistedEvents = new ArrayList<>();
+            ArrayList<StreamEvent> persistedEvents = new ArrayList<>();
 
             while (rs.next()) {
-                persistedEvents.add(resultSetToPersistedEvent(rs));
+                persistedEvents.add(resultSetToPersistedEvent(rs).toStreamEvent());
             }
 
             return List.ofAll(persistedEvents);
@@ -441,7 +419,7 @@ public class Postgres95EventStore implements EventStore {
     }
 
     @SuppressWarnings("unchecked")
-    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> StreamEvent<A, E> resultSetToPersistedEvent(
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> PostgresEvent<A, E> resultSetToPersistedEvent(
             ResultSet rs)
             throws SQLException, ClassNotFoundException {
         Long offset = rs.getLong(1);
@@ -457,7 +435,7 @@ public class Postgres95EventStore implements EventStore {
         E rawEvent = payloadMapper.deserialiseEvent(serialisedEvent, eventType, eventVersion);
         LocalDateTime timestamp = rs.getTimestamp(10).toLocalDateTime();
         Long sequenceNumber = rs.getLong(11);
-        return new PostgresStreamEvent<>(
+        return new PostgresEvent<>(
                 offset,
                 eventId,
                 aggregateId,
@@ -471,34 +449,10 @@ public class Postgres95EventStore implements EventStore {
                 sequenceNumber);
     }
 
-    private class PostgresStreamEvent<A extends Aggregate<?, E, State>, E extends DomainEvent, State> extends PostgresEvent<A, E> implements StreamEvent<A, E> {
-
-        private Long offset;
-
-        public PostgresStreamEvent(
-                Long offset,
-                EventId eventId,
-                AggregateId aggregateId,
-                AggregateType<A, ?, E, ?> aggregateType,
-                CausationId causationId,
-                Option<CorrelationId> correlationId,
-                E rawEvent,
-                String serialisedEvent,
-                Integer eventVersion,
-                LocalDateTime timestamp,
-                Long sequenceNumber) {
-            super(eventId, aggregateId, aggregateType, causationId, correlationId, rawEvent, serialisedEvent, eventVersion, timestamp, sequenceNumber);
-            this.offset = offset;
-        }
-
-        @Override
-        public Long offset() {
-            return offset;
-        }
-    }
-
     private class PostgresEvent<A extends Aggregate<?, E, ?>, E extends DomainEvent>
             implements PersistedEvent<A, E> {
+
+        private Long offset;
 
         private EventId eventId;
 
@@ -521,6 +475,7 @@ public class Postgres95EventStore implements EventStore {
         private Long sequenceNumber;
 
         public PostgresEvent(
+                Long offset,
                 EventId eventId,
                 AggregateId aggregateId,
                 AggregateType<A, ?, E, ?> aggregateType,
@@ -532,6 +487,7 @@ public class Postgres95EventStore implements EventStore {
                 LocalDateTime timestamp,
                 Long sequenceNumber) {
 
+            this.offset = offset;
             this.eventId = eventId;
             this.aggregateId = aggregateId;
             this.aggregateType = aggregateType;
@@ -542,6 +498,10 @@ public class Postgres95EventStore implements EventStore {
             this.eventVersion = eventVersion;
             this.timestamp = timestamp;
             this.sequenceNumber = sequenceNumber;
+        }
+
+        public Long getOffset() {
+            return offset;
         }
 
         @Override
@@ -614,6 +574,73 @@ public class Postgres95EventStore implements EventStore {
                     ", timestamp=" + timestamp +
                     ", sequenceNumber=" + sequenceNumber +
                     '}';
+        }
+
+        public StreamEvent toStreamEvent() {
+            final PayloadSerialisationResult serialisedPayload = payloadMapper.serialiseEvent(rawEvent());
+
+            return new StreamEvent() {
+
+                @Override
+                public Long offset() {
+                    return offset;
+                }
+
+                @Override
+                public String id() {
+                    return eventId.get();
+                }
+
+                @Override
+                public String aggregateType() {
+                    return aggregateType.name();
+                }
+
+                @Override
+                public String aggregateId() {
+                    return aggregateId.get();
+                }
+
+                @Override
+                public String causationId() {
+                    return causationId.get();
+                }
+
+                @Override
+                public Option<String> correlationId() {
+                    return correlationId.map(CorrelationId::get);
+                }
+
+                @Override
+                public String eventType() {
+                    return rawEvent.getClass().getName();
+                }
+
+                @Override
+                public String eventTag() {
+                    return rawEvent.tag().tag();
+                }
+
+                @Override
+                public LocalDateTime timestamp() {
+                    return timestamp;
+                }
+
+                @Override
+                public Long sequenceNumber() {
+                    return sequenceNumber;
+                }
+
+                @Override
+                public String serialisedPayload() {
+                    return serialisedPayload.payload();
+                }
+
+                @Override
+                public SerialisationContentType payloadContentType() {
+                    return serialisedPayload.contentType();
+                }
+            };
         }
     }
 }

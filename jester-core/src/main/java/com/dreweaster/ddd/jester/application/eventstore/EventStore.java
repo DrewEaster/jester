@@ -19,16 +19,7 @@ public interface EventStore {
             AggregateId aggregateId,
             Long afterSequenceNumber);
 
-    <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, State> aggregateType,
-            Integer batchSize);
-
-    <A extends Aggregate<?, E, State>, E extends DomainEvent, State> Future<List<StreamEvent<A, E>>> loadEventStream(
-            AggregateType<A, ?, E, State> aggregateType,
-            Long afterOffset,
-            Integer batchSize);
-
-    <E extends DomainEvent> Future<List<StreamEvent<?, E>>> loadEventStream(
+    <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(
             DomainEventTag tag,
             Long afterOffset,
             Integer batchSize);
