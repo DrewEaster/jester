@@ -11,7 +11,7 @@ public class EventId {
     }
 
     public static EventId createUnique() {
-        return new EventId(UUID.randomUUID().toString());
+        return new EventId(UUID.randomUUID().toString().replaceAll("-",""));
     }
 
     private String id;
