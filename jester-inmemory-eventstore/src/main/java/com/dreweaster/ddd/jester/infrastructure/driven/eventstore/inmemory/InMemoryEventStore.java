@@ -10,7 +10,7 @@ import io.vavr.collection.List;
 import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 // TODO: Delegate serialisation to an PayloadMapper
 // TODO: Is not serialising state
@@ -40,7 +40,12 @@ public class InMemoryEventStore implements EventStore {
 
     @Override
     public <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(DomainEventTag tag, Long afterOffset, Integer batchSize) {
-        return null;
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(DomainEventTag tag, Instant afterInstant, Integer batchSize) {
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -216,7 +221,7 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public LocalDateTime timestamp() {
+        public Instant timestamp() {
             return persistedEvent.timestamp();
         }
 
@@ -250,7 +255,7 @@ public class InMemoryEventStore implements EventStore {
 
         private E rawEvent;
 
-        private LocalDateTime timestamp = LocalDateTime.now();
+        private Instant timestamp = Instant.now();
 
         private Long sequenceNumber;
 
@@ -311,7 +316,7 @@ public class InMemoryEventStore implements EventStore {
         }
 
         @Override
-        public LocalDateTime timestamp() {
+        public Instant timestamp() {
             return timestamp;
         }
 

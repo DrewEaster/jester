@@ -2,6 +2,7 @@ package com.dreweaster.ddd.jester.infrastructure.driven.eventstore.postgres;
 
 import com.dreweaster.ddd.jester.application.eventstore.*;
 import com.dreweaster.ddd.jester.application.eventstore.PayloadMapper.PayloadSerialisationResult;
+import com.dreweaster.ddd.jester.application.util.DateTimeUtils;
 import com.dreweaster.ddd.jester.domain.*;
 import io.vavr.Tuple2;
 import io.vavr.collection.List;
@@ -11,7 +12,9 @@ import org.postgresql.util.PGobject;
 
 import javax.sql.DataSource;
 import java.sql.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 
@@ -59,6 +62,14 @@ public class Postgres95EventStore implements EventStore {
         return Future.of(executorService, () -> loadEventsForTag(
                 tag,
                 Option.of(afterOffset),
+                batchSize));
+    }
+
+    @Override
+    public <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(DomainEventTag tag, Instant afterInstant, Integer batchSize) {
+        return Future.of(executorService, () -> loadEventsForTag(
+                tag,
+                afterInstant,
                 batchSize));
     }
 
@@ -145,10 +156,6 @@ public class Postgres95EventStore implements EventStore {
             Option<State> state,
             Long expectedSequenceNumber) throws SQLException {
 
-        // TODO: What would sequence number be if no previous events had been saved?
-
-        LocalDateTime timestamp = LocalDateTime.now(); // TODO: Inject clock
-
         List<PersistedEvent<A, E>> persistedEvents = rawEvents.foldLeft(
                 new Tuple2<Long, List<PersistedEvent<A, E>>>(expectedSequenceNumber + 1, List.empty()), (acc, event) -> {
 
@@ -165,7 +172,7 @@ public class Postgres95EventStore implements EventStore {
                                     event,
                                     serialisationResult.payload(),
                                     serialisationResult.version().get(),
-                                    timestamp,
+                                    Instant.now(),
                                     acc._1)));
                 })._2;
 
@@ -255,6 +262,26 @@ public class Postgres95EventStore implements EventStore {
     }
 
     @SuppressWarnings("unchecked")
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> List<StreamEvent> loadEventsForTag(
+            DomainEventTag tag,
+            Instant afterInstant,
+            Integer batchSize) throws SQLException, ClassNotFoundException {
+
+        try (Connection con = dataSource.getConnection();
+             PreparedStatement ps = createEventsForTagPreparedStatement(con, tag, afterInstant, batchSize);
+             ResultSet rs = ps.executeQuery()) {
+
+            ArrayList<StreamEvent> persistedEvents = new ArrayList<>();
+
+            while (rs.next()) {
+                persistedEvents.add(resultSetToPersistedEvent(rs).toStreamEvent());
+            }
+
+            return List.ofAll(persistedEvents);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, ?>, E extends DomainEvent> PreparedStatement createSaveEventsBatchedPreparedStatement(
             Connection connection,
             AggregateType<A, ?, E, ?> aggregateType,
@@ -281,7 +308,7 @@ public class Postgres95EventStore implements EventStore {
             statement.setString(7, event.rawEvent().getClass().getName());
             statement.setInt(8, event.eventVersion());
             statement.setString(9, ((PostgresEvent<A, E>) event).serialisedEvent()); // TODO: Suspicious casting :-)
-            statement.setTimestamp(10, Timestamp.valueOf(event.timestamp()));
+            statement.setTimestamp(10, Timestamp.from(event.timestamp()));
             statement.setLong(11, event.sequenceNumber());
             statement.addBatch();
         }
@@ -418,6 +445,26 @@ public class Postgres95EventStore implements EventStore {
         return statement;
     }
 
+    private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> PreparedStatement createEventsForTagPreparedStatement(
+            Connection connection,
+            DomainEventTag tag,
+            Instant afterInstant,
+            Integer batchSize) throws SQLException {
+
+        PreparedStatement statement = connection.prepareStatement("" +
+                "SELECT global_offset, event_id, aggregate_id, aggregate_type, causation_id, correlation_id, event_type, event_version, event_payload, event_timestamp, sequence_number " +
+                "FROM domain_event " +
+                "WHERE tag = ? AND event_timestamp > ? " +
+                "ORDER BY global_offset " +
+                "LIMIT ?");
+
+        statement.setString(1, tag.tag());
+        statement.setTimestamp(2, Timestamp.from(afterInstant));
+        statement.setInt(3, batchSize);
+
+        return statement;
+    }
+
     @SuppressWarnings("unchecked")
     private <A extends Aggregate<?, E, State>, E extends DomainEvent, State> PostgresEvent<A, E> resultSetToPersistedEvent(
             ResultSet rs)
@@ -433,7 +480,7 @@ public class Postgres95EventStore implements EventStore {
         Integer eventVersion = rs.getInt(8);
         String serialisedEvent = rs.getString(9);
         E rawEvent = payloadMapper.deserialiseEvent(serialisedEvent, eventType, eventVersion);
-        LocalDateTime timestamp = rs.getTimestamp(10).toLocalDateTime();
+        Instant timestamp = rs.getTimestamp(10).toInstant();
         Long sequenceNumber = rs.getLong(11);
         return new PostgresEvent<>(
                 offset,
@@ -470,7 +517,7 @@ public class Postgres95EventStore implements EventStore {
 
         private Integer eventVersion;
 
-        private LocalDateTime timestamp = LocalDateTime.now();
+        private Instant timestamp = Instant.now();
 
         private Long sequenceNumber;
 
@@ -484,7 +531,7 @@ public class Postgres95EventStore implements EventStore {
                 E rawEvent,
                 String serialisedEvent,
                 Integer eventVersion,
-                LocalDateTime timestamp,
+                Instant timestamp,
                 Long sequenceNumber) {
 
             this.offset = offset;
@@ -550,7 +597,7 @@ public class Postgres95EventStore implements EventStore {
         }
 
         @Override
-        public LocalDateTime timestamp() {
+        public Instant timestamp() {
             return timestamp;
         }
 
@@ -622,7 +669,7 @@ public class Postgres95EventStore implements EventStore {
                 }
 
                 @Override
-                public LocalDateTime timestamp() {
+                public Instant timestamp() {
                     return timestamp;
                 }
 

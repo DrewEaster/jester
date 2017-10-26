@@ -4,6 +4,8 @@ import com.dreweaster.ddd.jester.domain.*;
 import io.vavr.collection.List;
 import io.vavr.concurrent.Future;
 
+import java.time.Instant;
+
 public interface EventStore {
 
     class OptimisticConcurrencyException extends RuntimeException {
@@ -22,6 +24,11 @@ public interface EventStore {
     <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(
             DomainEventTag tag,
             Long afterOffset,
+            Integer batchSize);
+
+    <E extends DomainEvent> Future<List<StreamEvent>> loadEventStream(
+            DomainEventTag tag,
+            Instant afterInstant,
             Integer batchSize);
 
     /**

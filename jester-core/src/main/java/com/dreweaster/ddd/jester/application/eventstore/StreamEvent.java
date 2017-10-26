@@ -2,7 +2,9 @@ package com.dreweaster.ddd.jester.application.eventstore;
 
 import io.vavr.control.Option;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 public interface StreamEvent {
 
@@ -22,7 +24,7 @@ public interface StreamEvent {
 
     String eventTag();
 
-    LocalDateTime timestamp();
+    Instant timestamp();
 
     Long sequenceNumber();
 

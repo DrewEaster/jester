@@ -6,6 +6,7 @@ import com.dreweaster.ddd.jester.domain.CommandId;
 import io.vavr.collection.HashSet;
 import io.vavr.collection.Set;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 public class TimeRestrictedCommandDeduplicationStrategy implements CommandDeduplicationStrategy {
@@ -23,11 +24,11 @@ public class TimeRestrictedCommandDeduplicationStrategy implements CommandDedupl
 
     public static class Builder implements CommandDeduplicationStrategyBuilder {
 
-        private LocalDateTime barrierDate;
+        private Instant barrierDate;
 
         private Set<CausationId> causationIds = HashSet.empty();
 
-        public Builder(LocalDateTime barrierDate) {
+        public Builder(Instant barrierDate) {
             this.barrierDate = barrierDate;
         }
 
