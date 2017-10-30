@@ -2,6 +2,8 @@ package com.dreweaster.ddd.jester.application.repository.deduplicating;
 
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
+import com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring.AggregateRepositoryReporter;
+import com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring.CommandHandlingProbe;
 import com.dreweaster.ddd.jester.domain.*;
 
 import io.vavr.Tuple2;
@@ -10,10 +12,15 @@ import io.vavr.collection.List;
 import io.vavr.concurrent.Future;
 import io.vavr.concurrent.Promise;
 import io.vavr.control.Either;
+import io.vavr.control.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
+import static io.vavr.API.$;
+import static io.vavr.API.Case;
+import static io.vavr.Predicates.*;
+
+import static io.vavr.API.Match;
 
 /**
  */
@@ -27,6 +34,8 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
 
     private CommandDeduplicationStrategyFactory commandDeduplicationStrategyFactory;
 
+    private List<AggregateRepositoryReporter> reporters = List.empty();
+
     public CommandDeduplicatingEventsourcedAggregateRepository(
             AggregateType<A, C, E, State> aggregateType,
             EventStore eventStore,
@@ -34,6 +43,14 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
         this.aggregateType = aggregateType;
         this.eventStore = eventStore;
         this.commandDeduplicationStrategyFactory = commandDeduplicationStrategyFactory;
+    }
+
+    public void addReporter(AggregateRepositoryReporter reporter) {
+        reporters = reporters.append(reporter);
+    }
+
+    public void removeReporter(AggregateRepositoryReporter reporter) {
+        reporters = reporters.remove(reporter);
     }
 
     @Override
@@ -54,7 +71,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
         }
 
         @Override
-        public Future<Optional<State>> state() {
+        public Future<Option<State>> state() {
             return eventStore.loadEvents(aggregateType, aggregateId).flatMap(previousEvents -> new AggregateRootRef<>(
                     aggregateType,
                     aggregateId,
@@ -62,55 +79,144 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
         }
 
         @Override
-        public Future<List<? super E>> handle(CommandEnvelope<C> commandEnvelope) {
-            return doHandle(AggregateRoutingCommandEnvelopeWrapper.of(aggregateId, commandEnvelope)).map(events ->
-                    events.map(PersistedEvent::rawEvent));
+        public Future<CommandHandlingResult<C, E>> handle(CommandEnvelope<C> commandEnvelope) {
+            AggregateRoutingCommandEnvelopeWrapper<C> wrapper = AggregateRoutingCommandEnvelopeWrapper.of(aggregateId, commandEnvelope);
+
+            ReportingContext reportingContext = new ReportingContext(aggregateId, reporters);
+            reportingContext.startedHandling(commandEnvelope);
+
+            return doHandle(wrapper, reportingContext).recoverWith(e ->
+                Match(e).of(
+                    Case($(instanceOf(EventStore.OptimisticConcurrencyException.class)), () -> {
+                        CommandHandlingResult<C,E> concurrentModificationResult = ConcurrentModificationResult.of(commandEnvelope);
+                        reportingContext.finishedHandling(concurrentModificationResult);
+                        return Future.successful(concurrentModificationResult);
+                    }),
+                    Case($(), () -> {
+                        reportingContext.finishedHandling(e);
+                        return Future.failed(e);
+                    })
+                )
+            );
         }
 
-        private Future<List<PersistedEvent<A, E>>> doHandle(AggregateRoutingCommandEnvelopeWrapper<? extends C> wrapper) {
+        private Future<CommandHandlingResult<C, E>> doHandle(AggregateRoutingCommandEnvelopeWrapper<C> wrapper, ReportingContext reportingContext) {
             // TODO: Load snapshot first (if any)
-            return eventStore.loadEvents(aggregateType, wrapper.aggregateId()).flatMap(previousEvents -> {
-                Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder> tuple = previousEvents.foldLeft(
-                        new Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder>(
-                                -1L, List.empty(), commandDeduplicationStrategyFactory.newBuilder()), (acc, e) ->
-                                new Tuple3<>(e.sequenceNumber(), acc._2.append(e.rawEvent()), acc._3.addEvent(e)));
+            // TODO: When using snapshots, would need to address how this would work with deduplication algorithm
+            // Snapshot would probably have to include ids of previously handled commands and their original responses
+            // Alternatively could always ensure snapshot is older than the length of time strategy covers for dedupe (e.g. at least 24 hours)
 
-                CommandDeduplicationStrategy deduplicationStrategy = tuple._3.build();
+            reportingContext.startedLoadingEvents();
+            return eventStore.loadEvents(aggregateType, wrapper.aggregateId())
+                .onFailure(reportingContext::finishedLoadingEvents)
+                .flatMap(previousEvents -> {
+                    reportingContext.finishedLoadingEvents(previousEvents);
+                    Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder> tuple = previousEvents.foldLeft(
+                            new Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder>(
+                                    -1L, List.empty(), commandDeduplicationStrategyFactory.newBuilder()), (acc, e) ->
+                                    new Tuple3<>(e.sequenceNumber(), acc._2.append(e.rawEvent()), acc._3.addEvent(e)));
 
-                AggregateRootRef<A, C, E, State> aggregateRootRef = new AggregateRootRef<>(
-                        aggregateType,
-                        wrapper.aggregateId(),
-                        tuple._2);
+                    CommandDeduplicationStrategy deduplicationStrategy = tuple._3.build();
 
-                if (!deduplicationStrategy.isDuplicate(wrapper.commandEnvelope.commandId())) {
-                    final Long finalExpectedSequenceNumber = tuple._1;
+                    AggregateRootRef<A, C, E, State> aggregateRootRef = new AggregateRootRef<>(
+                            aggregateType,
+                            wrapper.aggregateId(),
+                            tuple._2);
 
-                    // TODO: Allow state serialisation to be configurable
-                    return wrapper.commandEnvelope().correlationId().map(correlationId ->
-                                    aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEventsAndState ->
-                                            eventStore.saveEventsAndState(
-                                                    aggregateType,
-                                                    wrapper.aggregateId(),
-                                                    CausationId.of(wrapper.commandEnvelope().commandId().get()),
-                                                    correlationId,
-                                                    generatedEventsAndState._1,
-                                                    generatedEventsAndState._2,
-                                                    finalExpectedSequenceNumber))
-                    ).getOrElse(aggregateRootRef.handle(wrapper.commandEnvelope.command()).flatMap(generatedEventsAndState ->
-                            eventStore.saveEventsAndState(
+                    if (!deduplicationStrategy.isDuplicate(wrapper.commandEnvelope.commandId())) {
+                        Long expectedSequenceNumber = tuple._1;
+
+                        return handleAndPersist(wrapper, aggregateRootRef, expectedSequenceNumber, reportingContext).map(maybePersistedEvents -> {
+                            maybePersistedEvents.toTry().onSuccess(reportingContext::finishedPersistingEvents);
+                            if(maybePersistedEvents.isLeft()) {
+                                CommandHandlingResult<C,E>  rejectionResult = RejectionResult.of(wrapper.commandEnvelope,maybePersistedEvents.getLeft());
+                                reportingContext.finishedHandling(rejectionResult);
+                                return rejectionResult;
+                            } else {
+                                CommandHandlingResult<C,E> successResult = SuccessResult.of(wrapper.commandEnvelope, maybePersistedEvents.get().map(PersistedEvent::rawEvent));
+                                reportingContext.finishedHandling(successResult);
+                                return successResult;
+                            }
+                        });
+                    } else {
+                        // TODO: We should capture metrics about duplicated commands
+                        // TODO: Capture/log/report on age of duplicate commands
+                        // TODO: In theory should query event store specifically for all events matching command id (using snapshots would mean not all events would be read)
+                        // TODO: A little inefficient to do a full scan of all events rather than build up a model on first pass (see above)
+                        LOGGER.info("Skipped processing duplicate command: " + wrapper.commandEnvelope().command());
+                        CommandHandlingResult<C,E> deduplicationSuccessResult = SuccessResult.of(
+                                wrapper.commandEnvelope,
+                                previousEvents.filter(e -> e.causationId().get().equals(wrapper.commandEnvelope.commandId().get())).map(PersistedEvent::rawEvent), true);
+                        reportingContext.finishedHandling(deduplicationSuccessResult);
+                        return Future.successful(deduplicationSuccessResult);
+                    }
+                });
+        }
+
+        private Future<Either<Throwable, List<PersistedEvent<A,E>>>> handleAndPersist(
+                AggregateRoutingCommandEnvelopeWrapper<C> wrapper,
+                AggregateRootRef<A, C, E, State> aggregateRootRef,
+                Long expectedSequenceNumber,
+                ReportingContext reportingContext) {
+
+            reportingContext.startedApplyingCommand();
+            return wrapper.commandEnvelope.correlationId().map( correlationId ->
+                aggregateRootRef.handle(wrapper.commandEnvelope.command())
+                    .recoverWith( e -> {
+                        reportingContext.commandFailed(e);
+                        return Future.failed(e);
+                    })
+                    .flatMap(maybeGeneratedEventsAndState -> {
+                        maybeGeneratedEventsAndState.toTry()
+                                .onSuccess(eventsAndState -> reportingContext.commandAccepted(eventsAndState._1))
+                                .onFailure(reportingContext::commandRejected);
+                        return eitherFutureToFutureEither(maybeGeneratedEventsAndState.map(generatedEventsAndState -> {
+                            reportingContext.startedPersistingEvents(generatedEventsAndState._1, generatedEventsAndState._2, expectedSequenceNumber);
+                            return eventStore.saveEventsAndState(
                                     aggregateType,
                                     wrapper.aggregateId(),
                                     CausationId.of(wrapper.commandEnvelope().commandId().get()),
-                                    generatedEventsAndState._1,
-                                    generatedEventsAndState._2,
-                                    finalExpectedSequenceNumber)));
-                } else {
-                    // TODO: We should capture metrics about duplicated commands
-                    // TODO: Capture/log/report on age of duplicate commands
-                    LOGGER.info("Skipped processing duplicate command: " + wrapper.commandEnvelope().command());
-                    return Future.successful(List.empty());
-                }
-            });
+                                    correlationId,
+                                    maybeGeneratedEventsAndState.get()._1,
+                                    maybeGeneratedEventsAndState.get()._2,
+                                    expectedSequenceNumber).recoverWith( e -> {
+                                        reportingContext.finishedPersistingEvents(e);
+                                        return Future.failed(e);
+                                    });
+                        }));
+                    })
+            ).getOrElse(aggregateRootRef.handle(wrapper.commandEnvelope.command())
+                    .recoverWith( e -> {
+                        reportingContext.commandFailed(e);
+                        return Future.failed(e);
+                    })
+                    .flatMap(maybeGeneratedEventsAndState -> {
+                        maybeGeneratedEventsAndState.toTry()
+                                .onSuccess(eventsAndState -> reportingContext.commandAccepted(eventsAndState._1))
+                                .onFailure(reportingContext::commandRejected);
+                        return eitherFutureToFutureEither(maybeGeneratedEventsAndState.map(generatedEventsAndState -> {
+                            reportingContext.startedPersistingEvents(generatedEventsAndState._1, generatedEventsAndState._2, expectedSequenceNumber);
+                            return eventStore.saveEventsAndState(
+                                    aggregateType,
+                                    wrapper.aggregateId(),
+                                    CausationId.of(wrapper.commandEnvelope().commandId().get()),
+                                    maybeGeneratedEventsAndState.get()._1,
+                                    maybeGeneratedEventsAndState.get()._2,
+                                    expectedSequenceNumber).recoverWith( e -> {
+                                        reportingContext.finishedPersistingEvents(e);
+                                        return Future.failed(e);
+                                    });
+                        }));
+                    })
+            );
+        }
+
+        private Future<Either<Throwable, List<PersistedEvent<A,E>>>> eitherFutureToFutureEither(Either<Throwable,Future<List<PersistedEvent<A,E>>>> either) {
+            if(either.isRight()) {
+                return either.get().map(Either::right);
+            } else {
+                return Future.successful(Either.left(either.getLeft()));
+            }
         }
     }
 
@@ -128,11 +234,11 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             this.previousEvents = previousEvents;
         }
 
-        public Future<Optional<State>> state() {
-            Promise<Optional<State>> promise = Promise.make();
+        public Future<Option<State>> state() {
+            Promise<Option<State>> promise = Promise.make();
 
             if(previousEvents.isEmpty()) {
-                promise.success(Optional.empty());
+                promise.success(Option.none());
             } else {
                 try {
                     A aggregateInstance = aggregateType.clazz().newInstance();
@@ -141,16 +247,11 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                     Behaviour<C, E, State> behaviour = aggregateInstance.initialBehaviour();
 
                     for (E event : previousEvents) {
-                        Either<Throwable, Behaviour<C, E, State>> maybeBehaviour = behaviour.handleEvent(event);
-                        if (maybeBehaviour.isLeft()) {
-                            promise.failure(maybeBehaviour.getLeft());
-                            return promise.future();
-                        }
-                        behaviour = behaviour.handleEvent(event).get();
+                        behaviour = behaviour.handleEvent(event);
                     }
-                    promise.success(Optional.of(behaviour.state()));
+
+                    promise.success(Option.of(behaviour.state()));
                 } catch (Exception ex) {
-                    // TODO: Do we need to handle this more specifically? Caused by aggregate instance creation failure
                     promise.failure(ex);
                 }
             }
@@ -158,8 +259,8 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             return promise.future();
         }
 
-        public Future<Tuple2<List<E>,State>> handle(C command) {
-            Promise<Tuple2<List<E>,State>> promise = Promise.make();
+        public Future<Either<Throwable,Tuple2<List<E>,State>>> handle(C command) {
+            Promise<Either<Throwable,Tuple2<List<E>,State>>> promise = Promise.make();
 
             try {
                 A aggregateInstance = aggregateType.clazz().newInstance();
@@ -168,12 +269,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 Behaviour<C, E, State> behaviour = aggregateInstance.initialBehaviour();
 
                 for (E event : previousEvents) {
-                    Either<Throwable, Behaviour<C, E, State>> maybeBehaviour = behaviour.handleEvent(event);
-                    if (maybeBehaviour.isLeft()) {
-                        promise.failure(maybeBehaviour.getLeft());
-                        return promise.future();
-                    }
-                    behaviour = behaviour.handleEvent(event).get(); // FIXME: Calling get()
+                    behaviour = behaviour.handleEvent(event);
                 }
 
                 final Behaviour<C, E, State> finalBehaviour = behaviour;
@@ -191,13 +287,13 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                     }
                 });
 
-                handled.bimap(promise::failure, eventsList -> {
+                handled.bimap(e -> promise.success(Either.left(e)), eventsList -> {
                     // Apply events to get latest state for potential serialisation
                     Behaviour<C, E, State> updatedBehaviour = eventsList.foldLeft(
                             finalBehaviour,
-                            (acc,event) -> acc.handleEvent(event).getOrElseThrow(this::throwableToRuntimeException));
+                            Behaviour::handleEvent);
 
-                    return promise.success(new Tuple2<>(eventsList, updatedBehaviour.state()));
+                    return promise.success(Either.right(new Tuple2<>(eventsList, updatedBehaviour.state())));
                 });
 
             } catch (Exception ex) {
@@ -206,14 +302,6 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
             }
 
             return promise.future();
-        }
-
-        private RuntimeException throwableToRuntimeException(Throwable throwable) {
-            if(throwable instanceof RuntimeException) {
-                return (RuntimeException)throwable;
-            } else {
-                return new RuntimeException(throwable);
-            }
         }
     }
 
@@ -246,6 +334,85 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                     "aggregateId=" + aggregateId +
                     ", commandEnvelope=" + commandEnvelope +
                     '}';
+        }
+    }
+
+    private class ReportingContext implements CommandHandlingProbe<A,C,E,State> {
+
+        private List<CommandHandlingProbe<A,C,E,State>> probes;
+
+        ReportingContext(AggregateId aggregateId, List<AggregateRepositoryReporter> reporters) {
+            probes = reporters.map(reporter -> reporter.createProbe(aggregateType, aggregateId));
+        }
+
+        @Override
+        public void startedHandling(CommandEnvelope<C> command) {
+            probes.forEach(probe -> probe.startedHandling(command));
+        }
+
+        @Override
+        public void startedLoadingEvents() {
+            probes.forEach(CommandHandlingProbe::startedLoadingEvents);
+        }
+
+        @Override
+        public void finishedLoadingEvents(List<PersistedEvent<A,E>> events) {
+            probes.forEach(probe -> probe.finishedLoadingEvents(events));
+        }
+
+        @Override
+        public void finishedLoadingEvents(Throwable unexpectedException) {
+            probes.forEach(probe -> probe.finishedLoadingEvents(unexpectedException));
+        }
+
+        @Override
+        public void startedApplyingCommand() {
+            probes.forEach(CommandHandlingProbe::startedApplyingCommand);
+        }
+
+        @Override
+        public void commandAccepted(List<? super E> events) {
+            probes.forEach(probe -> probe.commandAccepted(events));
+        }
+
+        @Override
+        public void commandRejected(Throwable rejection) {
+            probes.forEach(probe -> probe.commandRejected(rejection));
+        }
+
+        @Override
+        public void commandFailed(Throwable unexpectedException) {
+            probes.forEach(probe -> probe.commandFailed(unexpectedException));
+        }
+
+        @Override
+        public void startedPersistingEvents(List<? super E> events, long expectedSequenceNumber) {
+            probes.forEach(probe -> probe.startedPersistingEvents(events, expectedSequenceNumber));
+        }
+
+        @Override
+        public void startedPersistingEvents(List<? super E> events, State state, long expectedSequenceNumber) {
+            probes.forEach(probe -> probe.startedPersistingEvents(events, state, expectedSequenceNumber));
+        }
+
+        @Override
+        public void finishedPersistingEvents(List<PersistedEvent<A, E>> persistedEvents) {
+            probes.forEach(probe -> probe.finishedPersistingEvents(persistedEvents));
+        }
+
+        @Override
+        public void finishedPersistingEvents(Throwable unexpectedException) {
+            probes.forEach(probe -> probe.finishedPersistingEvents(unexpectedException));
+        }
+
+        @Override
+        public void finishedHandling(CommandHandlingResult<C, E> result) {
+            probes.forEach(probe -> probe.finishedHandling(result));
+        }
+
+        @Override
+        public void finishedHandling(Throwable unexpectedException) {
+            probes.forEach(probe -> probe.finishedHandling(unexpectedException));
         }
     }
 }

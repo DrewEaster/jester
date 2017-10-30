@@ -92,6 +92,101 @@ public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends
         }
     }
 
+    interface CommandHandlingResult<C extends DomainCommand, E extends DomainEvent> {
+
+        CommandEnvelope<C> command();
+    }
+
+    class SuccessResult<C extends DomainCommand, E extends DomainEvent> implements CommandHandlingResult<C,E> {
+
+        public static <C extends DomainCommand, E extends DomainEvent> SuccessResult<C,E> of(CommandEnvelope<C> commandEnvelope, List<? super E> generatedEvents) {
+            return new SuccessResult<>(commandEnvelope, generatedEvents, false);
+        }
+
+        public static <C extends DomainCommand, E extends DomainEvent> SuccessResult<C,E> of(CommandEnvelope<C> commandEnvelope, List<? super E> generatedEvents, boolean deduplicated) {
+            return new SuccessResult<>(commandEnvelope, generatedEvents, deduplicated);
+        }
+
+        private CommandEnvelope<C> commandEnvelope;
+
+        private List<? super E> generatedEvents;
+
+        private boolean deduplicated;
+
+        private SuccessResult(CommandEnvelope<C> commandEnvelope, List<? super E> generatedEvents, boolean deduplicated) {
+            this.commandEnvelope = commandEnvelope;
+            this.generatedEvents = generatedEvents;
+            this.deduplicated = deduplicated;
+        }
+
+        @Override
+        public CommandEnvelope<C> command() {
+            return commandEnvelope;
+        }
+
+        public List<? super E> generatedEvents() {
+            return generatedEvents;
+        }
+
+        public boolean wasDeduplicated() {
+            return deduplicated;
+        }
+    }
+
+    class RejectionResult<C extends DomainCommand, E extends DomainEvent> implements CommandHandlingResult<C,E> {
+
+        public static <C extends DomainCommand, E extends DomainEvent> RejectionResult<C,E> of(CommandEnvelope<C> commandEnvelope, Throwable error) {
+            return new RejectionResult<>(commandEnvelope, error, false);
+        }
+
+        public static <C extends DomainCommand, E extends DomainEvent> RejectionResult<C,E> of(CommandEnvelope<C> commandEnvelope, Throwable error, boolean deduplicated) {
+            return new RejectionResult<>(commandEnvelope, error, deduplicated);
+        }
+
+        private CommandEnvelope<C> commandEnvelope;
+
+        private Throwable error;
+
+        private boolean deduplicated;
+
+        private RejectionResult(CommandEnvelope<C> commandEnvelope, Throwable error, boolean deduplicated) {
+            this.commandEnvelope = commandEnvelope;
+            this.error = error;
+            this.deduplicated = deduplicated;
+        }
+
+        @Override
+        public CommandEnvelope<C> command() {
+            return commandEnvelope;
+        }
+
+        public Throwable error() {
+            return error;
+        }
+
+        public boolean wasDeduplicated() {
+            return deduplicated;
+        }
+    }
+
+    class ConcurrentModificationResult<C extends DomainCommand, E extends DomainEvent> implements CommandHandlingResult<C,E> {
+
+        public static <C extends DomainCommand, E extends DomainEvent> ConcurrentModificationResult<C,E> of(CommandEnvelope<C> commandEnvelope) {
+            return new ConcurrentModificationResult<>(commandEnvelope);
+        }
+
+        private CommandEnvelope<C> commandEnvelope;
+
+        private ConcurrentModificationResult(CommandEnvelope<C> commandEnvelope) {
+            this.commandEnvelope = commandEnvelope;
+        }
+
+        @Override
+        public CommandEnvelope<C> command() {
+            return commandEnvelope;
+        }
+    }
+
     interface AggregateRoot<C extends DomainCommand, E extends DomainEvent, State> {
 
         class NoHandlerForCommand extends RuntimeException {
@@ -108,9 +203,9 @@ public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends
             }
         }
 
-        Future<List<? super E>> handle(CommandEnvelope<C> commandEnvelope);
+        Future<CommandHandlingResult<C, E>> handle(CommandEnvelope<C> commandEnvelope);
 
-        Future<Optional<State>> state();
+        Future<Option<State>> state();
     }
 
     AggregateRoot<C, E, State> aggregateRootOf(AggregateId aggregateId);

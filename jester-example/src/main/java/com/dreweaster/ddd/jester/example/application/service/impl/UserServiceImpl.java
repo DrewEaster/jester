@@ -1,7 +1,6 @@
 package com.dreweaster.ddd.jester.example.application.service.impl;
 
 import com.dreweaster.ddd.jester.domain.AggregateId;
-import com.dreweaster.ddd.jester.domain.AggregateRepository;
 import com.dreweaster.ddd.jester.domain.CommandId;
 import com.dreweaster.ddd.jester.example.application.service.UserService;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.repository.UserRepository;
@@ -26,6 +25,11 @@ public class UserServiceImpl implements UserService {
     public Future<AggregateId> createUser(AggregateId aggregateId, CommandId commandId, RegisterUser registerUser) {
         return userRepository.aggregateRootOf(aggregateId)
                 .handle(CommandEnvelope.of(commandId, registerUser))
-                .map(events -> aggregateId);
+                .map(result -> aggregateId);
+//                Match(r.getClass()).of(
+//                        Case($(SuccessResult.class), Future.successful(aggregateId)),
+//                        Case($(RejectionResult.class), Future.failed(new RuntimeException())),
+//                        Case($(ConcurrentModificationResult.class), Future.failed(new EventStore.OptimisticConcurrencyException()))
+//                )
     }
 }

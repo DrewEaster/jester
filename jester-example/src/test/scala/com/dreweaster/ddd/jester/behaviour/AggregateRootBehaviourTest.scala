@@ -1,27 +1,24 @@
 package com.dreweaster.ddd.jester.behaviour
 
-import java.util.Optional
 import io.vavr.concurrent.Future
-import io.vavr.control
 import io.vavr.control.Option
-import javax.tools.OptionChecker
-
-import com.dreweaster.ddd.jester.application.eventstore.EventStore.OptimisticConcurrencyException
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent
+import com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring.{AggregateRepositoryReporter, CommandHandlingProbe}
 import com.dreweaster.ddd.jester.application.repository.deduplicating.{CommandDeduplicationStrategy, CommandDeduplicationStrategyBuilder, CommandDeduplicationStrategyFactory}
 import com.dreweaster.ddd.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForCommand, NoHandlerForEvent}
-import com.dreweaster.ddd.jester.domain.{AggregateId, CausationId, CommandId}
-import com.dreweaster.ddd.jester.domain.AggregateRepository.CommandEnvelope
+import com.dreweaster.ddd.jester.domain._
+import com.dreweaster.ddd.jester.domain.AggregateRepository.{CommandEnvelope, ConcurrentModificationResult, RejectionResult, SuccessResult}
 import com.dreweaster.ddd.jester.example.application.repository.CommandDeduplicatingEventsourcedUserRepository
-import com.dreweaster.ddd.jester.example.domain.aggregates.user
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.User.AlreadyRegistered
 import com.dreweaster.ddd.jester.infrastructure.driven.eventstore.MockEventStore
 import org.scalatest.{BeforeAndAfter, FlatSpec, GivenWhenThen, Matchers}
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.events._
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands._
 import com.dreweaster.ddd.jester.example.domain.aggregates.user._
+import io.vavr.collection
 
 /**
+  * TODO: Add tests to show that reporting probes are called correctly in all common scenarios
   */
 class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with BeforeAndAfter with Matchers {
 
@@ -34,10 +31,15 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
 
   val userRepository = new CommandDeduplicatingEventsourcedUserRepository(eventStore, deduplicationStrategyFactory)
 
+  val reporter = new Reporter
+
+  // userRepository.addReporter(reporter)
+
   before {
     eventStore.clear()
     eventStore.toggleLoadErrorStateOff()
     eventStore.toggleSaveErrorStateOff()
+    eventStore.toggleOffOptimisticConcurrencyExceptionOnSave()
     deduplicationStrategyFactory.toggleDeduplicationOn()
   }
 
@@ -46,7 +48,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command to create the aggregate")
-    val futureEvents = await(user.handle(
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_command_id"),
         RegisterUser.builder()
@@ -55,11 +57,11 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     Then("the command result should be successful")
-    futureEvents.isSuccess should be(true)
+    val successResult = result.asInstanceOf[Future[SuccessResult[_,_]]]
 
     And("the aggregate should be created")
-    futureEvents.get().size() should be(1)
-    futureEvents.get().get(0) should be(UserRegistered.builder()
+    successResult.get().generatedEvents().size() should be(1)
+    successResult.get().generatedEvents().get(0) should be(UserRegistered.builder()
       .username("joebloggs")
       .password("password")
       .create())
@@ -73,7 +75,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val state = await(user.state())
 
     Then("the state should be an empty option")
-    state.get() should be (Optional.empty())
+    state.get() should be (Option.none())
   }
 
   it should "return the initial state following handling its creation command" in {
@@ -93,7 +95,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val state = await(user.state())
 
     Then("the state should be defined")
-    state.get().isPresent should be(true)
+    state.get().isDefined should be(true)
 
     And("the state should be correct")
     state.get().get() should be(UserState.builder()
@@ -122,7 +124,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val state = await(user.state())
 
     Then("the state should be defined")
-    state.get().isPresent should be(true)
+    state.get().isDefined should be(true)
 
     And("the state should be correct")
     state.get().get() should be(UserState.builder()
@@ -144,7 +146,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     When("sending a command that queries existing state")
-    val futureEvents = await(user.handle(
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_other_command_id"),
         ChangePassword.builder()
@@ -152,11 +154,11 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     Then("the command result should be successful")
-    futureEvents.isSuccess should be(true)
+    val successResult = result.asInstanceOf[Future[SuccessResult[_,_]]]
 
     And("the emitted event should correctly refer to some existing state")
-    futureEvents.get().size() should be(1)
-    futureEvents.get().get(0) should be(PasswordChanged.builder()
+    successResult.get().generatedEvents().size() should be(1)
+    successResult.get().generatedEvents().get(0) should be(PasswordChanged.builder()
       .password("changedPassword")
       .oldPassword("password")
       .create())
@@ -178,67 +180,73 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     await(user.handle(CommandEnvelope.of(CommandId.of("command_id_4"), IncrementFailedLoginAttempts.of())))
 
     When("sending a command that should lead to multiple events being emitted")
-    val futureEvents = await(user.handle(CommandEnvelope.of(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.of())))
-
-    Then("multiple events should be emitted as expected")
-    futureEvents.isSuccess should be(true)
-    futureEvents.get().size() should be(2)
-    futureEvents.get().get(0) should be(FailedLoginAttemptsIncremented.of())
-    futureEvents.get().get(1) should be(UserLocked.of())
-  }
-
-  it should "ignore a command with a previously handled command id and of the same command type" in {
-    Given("an aggregate created with a deterministic command id")
-    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
-    await(user.handle(
-      CommandEnvelope.of(
-        CommandId.of("some_command_id"),
-        RegisterUser.builder()
-          .username("joebloggs")
-          .password("password")
-          .create())))
-
-    When("sending the same command id again using a command of the type")
-    val futureEvents = await(user.handle(
-      CommandEnvelope.of(
-        CommandId.of("some_command_id"),
-        RegisterUser.builder()
-          .username("joebloggs")
-          .password("password")
-          .create())))
+    val result = await(user.handle(CommandEnvelope.of(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.of())))
 
     Then("the command result should be successful")
-    futureEvents.isSuccess should be(true)
+    val successResult = result.asInstanceOf[Future[SuccessResult[_,_]]]
 
-    And("no events should be generated")
-    futureEvents.get().size() should be(0)
+    And("multiple events should be emitted as expected")
+    successResult.get().generatedEvents().size() should be(2)
+    successResult.get().generatedEvents().get(0) should be(FailedLoginAttemptsIncremented.of())
+    successResult.get().generatedEvents().get(1) should be(UserLocked.of())
   }
 
-  it should "ignore a command with a previously handled command id and of a different command type" in {
-    Given("an aggregate created with a deterministic command id")
+  it should "deduplicate a command with a previously handled command id and of the same command type" in {
+    Given("An aggregate that's handled some commands")
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+
     await(user.handle(
       CommandEnvelope.of(
-        CommandId.of("some_command_id"),
+        CommandId.of("command_id_1"),
         RegisterUser.builder()
           .username("joebloggs")
           .password("password")
           .create())))
 
-    When("sending the same command id again using a command of a different type")
-    val futureEvents = await(user.handle(
-      CommandEnvelope.of(
-        CommandId.of("some_command_id"),
-        ChangePassword.builder()
-          .password("newPassword")
-          .create())))
+    await(user.handle(CommandEnvelope.of(CommandId.of("command_id_2"), IncrementFailedLoginAttempts.of())))
+    await(user.handle(CommandEnvelope.of(CommandId.of("command_id_3"), IncrementFailedLoginAttempts.of())))
+    await(user.handle(CommandEnvelope.of(CommandId.of("command_id_4"), IncrementFailedLoginAttempts.of())))
+    val firstResult = await(user.handle(CommandEnvelope.of(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.of())))
+    val eventsGeneratedWhenCommandFirstHandled = firstResult.asInstanceOf[Future[SuccessResult[_,_]]].get().generatedEvents()
+
+    When("sending the same command id again using a command of the same type")
+    val secondResult = await(user.handle(CommandEnvelope.of(CommandId.of("command_id_5"), IncrementFailedLoginAttempts.of())))
 
     Then("the command result should be successful")
-    futureEvents.isSuccess should be(true)
+    val successResult = secondResult.asInstanceOf[Future[SuccessResult[_,_]]]
 
-    And("no events should be generated")
-    futureEvents.get().size() should be(0)
+    And("the result should be flagged as deduplicated")
+    successResult.get().wasDeduplicated() should be (true)
+
+    And("the same events as generated when the command was first handled should be returned again")
+    successResult.get().generatedEvents() should be (eventsGeneratedWhenCommandFirstHandled)
   }
+
+//  it should "ignore a command with a previously handled command id and of a different command type" in {
+//    Given("an aggregate created with a deterministic command id")
+//    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+//    await(user.handle(
+//      CommandEnvelope.of(
+//        CommandId.of("some_command_id"),
+//        RegisterUser.builder()
+//          .username("joebloggs")
+//          .password("password")
+//          .create())))
+//
+//    When("sending the same command id again using a command of a different type")
+//    val futureEvents = await(user.handle(
+//      CommandEnvelope.of(
+//        CommandId.of("some_command_id"),
+//        ChangePassword.builder()
+//          .password("newPassword")
+//          .create())))
+//
+//    Then("the command result should be successful")
+//    futureEvents.isSuccess should be(true)
+//
+//    And("no events should be generated")
+//    futureEvents.get().size() should be(0)
+//  }
 
   it should "propagate error when a command is explicitly rejected in its current behaviour" in {
     Given("an aggregate")
@@ -252,7 +260,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     When("sending a command that will be rejected in its current behaviour")
-    val futureEvents = await(user.handle(
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_other_command_id"),
         RegisterUser.builder()
@@ -260,11 +268,11 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .password("password")
           .create())))
 
-    Then("the command should fail")
-    futureEvents.isSuccess should be(false)
+    Then("the command should be rejected")
+    val rejectionResult = result.asInstanceOf[Future[RejectionResult[_,_]]]
 
     And("the correct command error should be returned")
-    futureEvents.getCause.get shouldBe an[AlreadyRegistered]
+    rejectionResult.get().error() shouldBe an[AlreadyRegistered]
   }
 
   it should "generate an error when a command is not explicitly handled in its current behaviour" in {
@@ -272,7 +280,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command that isn't explicitly handled in its current behaviour")
-    val futureEvents = await(user.handle(
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_command_id"),
         ChangePassword.builder()
@@ -280,10 +288,10 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     Then("the command should fail")
-    futureEvents.isSuccess should be(false)
+    result.isSuccess should be(false)
 
     And("the unhandled command error should be returned")
-    futureEvents.getCause.get shouldBe an[NoHandlerForCommand]
+    result.getCause.get shouldBe an[NoHandlerForCommand]
   }
 
   it should "generate an error when handling a command for which there is no corresponding event supported in its current behaviour" in {
@@ -298,7 +306,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     When("Sending a command that has no corresponding event handler")
-    val futureEvents = await(user.handle(
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_other_command_id"),
         ChangeUsername.builder()
@@ -306,10 +314,10 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     Then("the command should fail")
-    futureEvents.isSuccess should be(false)
+    result.isSuccess should be(false)
 
     And("the no handler for event error should be returned")
-    futureEvents.getCause.get shouldBe an[NoHandlerForEvent]
+    result.getCause.get shouldBe an[NoHandlerForEvent]
   }
 
   it should "propagate error if event store fails to load events when handling a command" in {
@@ -332,7 +340,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     futureEvents.isSuccess should be(false)
 
     And("the event store's error should be returned")
-    futureEvents.getCause.get shouldBe an[OptimisticConcurrencyException]
+    futureEvents.getCause.get shouldBe an[IllegalStateException]
   }
 
   it should "propagate error if event store fails to load events when fetching state" in {
@@ -349,7 +357,25 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     state.isSuccess should be(false)
 
     And("the event store's error should be returned")
-    state.getCause.get shouldBe an[OptimisticConcurrencyException]
+    state.getCause.get shouldBe an[IllegalStateException]
+  }
+
+  it should "return a ConcurrentModification result when saving to event store generates an OptimisticConcurrencyException" in {
+    Given("an aggregate that's modified by another process during command handling")
+    val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
+    eventStore.toggleOnOptimisticConcurrencyExceptionOnSave()
+
+    When("sending a command")
+    val result = await(user.handle(
+      CommandEnvelope.of(
+        CommandId.of("some_command_id"),
+        RegisterUser.builder()
+          .username("joebloggs")
+          .password("password")
+          .create())))
+
+    Then("the result should report a concurrent modification")
+    result.get() shouldBe an[ConcurrentModificationResult[_,_]]
   }
 
   it should "propagate error when event store fails to save generated events" in {
@@ -360,7 +386,7 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
     val user = userRepository.aggregateRootOf(AggregateId.of("some-aggregate-id"))
 
     When("sending a command")
-    val futureEvents = await(user.handle(
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("some_command_id"),
         RegisterUser.builder()
@@ -369,14 +395,14 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     Then("the command should fail")
-    futureEvents.isSuccess should be(false)
+    result.isSuccess should be(false)
 
     And("the event store's error should be returned")
-    futureEvents.getCause.get shouldBe an[IllegalStateException]
+    result.getCause.get shouldBe an[IllegalStateException]
   }
 
   it should "process a duplicate command if the deduplication strategy says it's ok to process it" in {
-    Given("the deduplication strategy is not configured to perform deduplication")
+    Given("the deduplication strategy is configured to not perform deduplication")
     deduplicationStrategyFactory.toggleDeduplicationOff()
 
     And("an aggregate")
@@ -390,8 +416,8 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     When("sending the two commands with the same command id")
-    await(user.handle(CommandEnvelope.of(CommandId.of("command_id"), ChangePassword.builder().password("newPassword").create())))
-    val futureEvents = await(user.handle(
+    await(user.handle(CommandEnvelope.of(CommandId.of("some_command_id"), ChangePassword.builder().password("newPassword").create())))
+    val result = await(user.handle(
       CommandEnvelope.of(
         CommandId.of("command_id"),
         ChangePassword.builder()
@@ -399,9 +425,9 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
           .create())))
 
     Then("the second command will not be deduplicated")
-    futureEvents.isSuccess should be(true)
-    futureEvents.get().size() should be(1)
-    futureEvents.get().get(0) should be(PasswordChanged.builder()
+    val successResult = result.asInstanceOf[Future[SuccessResult[_,_]]]
+    successResult.get().generatedEvents().size() should be(1)
+    successResult.get().generatedEvents().get(0) should be(PasswordChanged.builder()
       .password("anotherNewPassword")
       .oldPassword("newPassword").create())
   }
@@ -438,6 +464,41 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
               if (deduplicationEnabled) causationIds.contains(CausationId.of(commandId.get())) else false
           }
         }
+      }
+    }
+  }
+
+  class Reporter extends AggregateRepositoryReporter {
+    override def createProbe[A <: Aggregate[C, E, State], C <: DomainCommand, E <: DomainEvent, State](aggregateType: AggregateType[A, C, E, State], aggregateId: AggregateId): CommandHandlingProbe[A, C, E, State] = {
+      new CommandHandlingProbe[A,C,E,State] {
+
+        override def startedHandling(command: CommandEnvelope[C]) = println(s"Started handling: $command")
+
+        override def startedLoadingEvents() = println(s"Started loading previous events")
+
+        override def finishedLoadingEvents(previousEvents: collection.List[PersistedEvent[A, E]]) = println(s"Loaded previous events $previousEvents")
+
+        override def finishedLoadingEvents(unexpectedException: Throwable) = println(s"Failed to load previous events due to: ${unexpectedException.getClass.getName}")
+
+        override def startedApplyingCommand() = println(s"Started applying command")
+
+        override def commandAccepted(events: collection.List[_ >: E]) = println(s"Command accepted: $events")
+
+        override def commandRejected(rejection: Throwable) = println(s"Command rejected: ${rejection.getClass.getName}")
+
+        override def commandFailed(unexpectedException: Throwable) = println(s"Command failed: ${unexpectedException.getClass.getName}")
+
+        override def startedPersistingEvents(events: collection.List[_ >: E], expectedSequenceNumber: Long) = println(s"Started persisting events: $events")
+
+        override def startedPersistingEvents(events: collection.List[_ >: E], state: State, expectedSequenceNumber: Long) = println(s"Started persisting events and state: $events, $state")
+
+        override def finishedPersistingEvents(persistedEvents: collection.List[PersistedEvent[A, E]]) = println(s"Finished persisting events: $persistedEvents")
+
+        override def finishedPersistingEvents(unexpectedException: Throwable) = println(s"Failed to persist events:  ${unexpectedException.getClass.getName}")
+
+        override def finishedHandling(result: AggregateRepository.CommandHandlingResult[C, E]) = println(s"Finished command handling: ${result.getClass.getName}")
+
+        override def finishedHandling(unexpectedException: Throwable) = println(s"Command handling failed: ${unexpectedException.getClass.getName}")
       }
     }
   }

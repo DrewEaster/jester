@@ -42,20 +42,20 @@ public class Behaviour<C extends DomainCommand, E extends DomainEvent, State> {
     @SuppressWarnings("unchecked")
     public final Either<Throwable, List<E>> handleCommand(C command, CommandContext<E, State> commandContext) {
         return untypedCommandHandlers.get(command.getClass()).map(handler ->
-                (Either<Throwable, List<E>>) handler.apply(command, commandContext)).getOrElse(
-                Either.left(new NoHandlerForCommand(command)));
+                (Either<Throwable, List<E>>) handler.apply(command, commandContext)).getOrElseThrow(
+                () -> new NoHandlerForCommand(command));
     }
 
     @SuppressWarnings("unchecked")
-    public final Either<Throwable, Behaviour<C, E, State>> handleEvent(E event) {
+    public final Behaviour<C, E, State> handleEvent(E event) {
         return untypedEventHandlers.get(event.getClass())
                 .map(handler -> applyUntypedEventHandler(handler, event))
-                .getOrElse(Either.left(new NoHandlerForEvent(event)));
+                .getOrElseThrow(() -> new NoHandlerForEvent(event));
     }
 
     @SuppressWarnings("unchecked")
-    private Either<Throwable, Behaviour<C, E, State>> applyUntypedEventHandler(Function2 eventHandler, E event) {
-        return Either.right((Behaviour<C, E, State>) eventHandler.apply(event, this));
+    private Behaviour<C, E, State> applyUntypedEventHandler(Function2 eventHandler, E event) {
+        return (Behaviour<C, E, State>) eventHandler.apply(event, this);
     }
 
     /**

@@ -13,6 +13,16 @@ public class MockEventStore extends InMemoryEventStore {
 
     private boolean saveErrorState = false;
 
+    public boolean optimisticConcurrencyExceptionOnSave = false;
+
+    public void toggleOnOptimisticConcurrencyExceptionOnSave() {
+        optimisticConcurrencyExceptionOnSave = true;
+    }
+
+    public void toggleOffOptimisticConcurrencyExceptionOnSave() {
+        optimisticConcurrencyExceptionOnSave = false;
+    }
+
     public void toggleLoadErrorStateOn() {
         loadErrorState = true;
     }
@@ -36,7 +46,7 @@ public class MockEventStore extends InMemoryEventStore {
 
         if (loadErrorState) {
             Promise<List<PersistedEvent<A, E>>> promise = Promise.make();
-            promise.failure(new OptimisticConcurrencyException());
+            promise.failure(new IllegalStateException());
             return promise.future();
         }
         return super.loadEvents(aggregateType, aggregateId);
@@ -49,6 +59,10 @@ public class MockEventStore extends InMemoryEventStore {
             CausationId causationId,
             List<E> rawEvents,
             Long expectedSequenceNumber) {
+
+        if(optimisticConcurrencyExceptionOnSave) {
+            return Future.failed(new OptimisticConcurrencyException());
+        }
         if (saveErrorState) {
             return Future.failed(new IllegalStateException());
         } else {
@@ -64,6 +78,10 @@ public class MockEventStore extends InMemoryEventStore {
             CorrelationId correlationId,
             List<E> rawEvents,
             Long expectedSequenceNumber) {
+
+        if(optimisticConcurrencyExceptionOnSave) {
+            return Future.failed(new OptimisticConcurrencyException());
+        }
         if (saveErrorState) {
             return Future.failed(new IllegalStateException());
         } else {

@@ -16,8 +16,4 @@ public interface CommandContext<E extends DomainEvent, State> {
     default Either<Throwable, List<E>> error(Throwable error) {
         return Either.left(error);
     }
-
-    default void invalidCommand(String message) {
-        error(new Aggregate.InvalidCommandException(message));
-    }
 }
