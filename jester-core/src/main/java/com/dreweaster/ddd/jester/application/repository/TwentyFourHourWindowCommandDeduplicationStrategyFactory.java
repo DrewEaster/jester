@@ -1,4 +1,4 @@
-package com.dreweaster.ddd.jester.application.repository.deduplicating;
+package com.dreweaster.ddd.jester.application.repository;
 
 import static com.dreweaster.ddd.jester.application.util.DateTimeUtils.utcNow;
 

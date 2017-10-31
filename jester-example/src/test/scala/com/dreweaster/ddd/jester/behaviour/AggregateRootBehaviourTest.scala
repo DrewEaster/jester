@@ -3,8 +3,8 @@ package com.dreweaster.ddd.jester.behaviour
 import io.vavr.concurrent.Future
 import io.vavr.control.Option
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent
-import com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring.{AggregateRepositoryReporter, CommandHandlingProbe}
-import com.dreweaster.ddd.jester.application.repository.deduplicating.{CommandDeduplicationStrategy, CommandDeduplicationStrategyBuilder, CommandDeduplicationStrategyFactory}
+import com.dreweaster.ddd.jester.application.repository.{CommandDeduplicationStrategy, CommandDeduplicationStrategyBuilder, CommandDeduplicationStrategyFactory}
+import com.dreweaster.ddd.jester.application.repository.monitoring.{AggregateRepositoryReporter, CommandHandlingProbe}
 import com.dreweaster.ddd.jester.domain.AggregateRepository.AggregateRoot.{NoHandlerForCommand, NoHandlerForEvent}
 import com.dreweaster.ddd.jester.domain._
 import com.dreweaster.ddd.jester.domain.AggregateRepository.{CommandEnvelope, ConcurrentModificationResult, RejectionResult, SuccessResult}
@@ -482,11 +482,11 @@ class AggregateRootBehaviourTest extends FlatSpec with GivenWhenThen with Before
 
         override def startedApplyingCommand() = println(s"Started applying command")
 
-        override def commandAccepted(events: collection.List[_ >: E]) = println(s"Command accepted: $events")
+        override def commandApplicationAccepted(events: collection.List[_ >: E], deduplicated: Boolean) = println(s"Command accepted: $events")
 
-        override def commandRejected(rejection: Throwable) = println(s"Command rejected: ${rejection.getClass.getName}")
+        override def commandApplicationRejected(rejection: Throwable, deduplicated: Boolean) = println(s"Command rejected: ${rejection.getClass.getName}")
 
-        override def commandFailed(unexpectedException: Throwable) = println(s"Command failed: ${unexpectedException.getClass.getName}")
+        override def commandApplicationFailed(unexpectedException: Throwable) = println(s"Command failed: ${unexpectedException.getClass.getName}")
 
         override def startedPersistingEvents(events: collection.List[_ >: E], expectedSequenceNumber: Long) = println(s"Started persisting events: $events")
 

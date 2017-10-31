@@ -1,4 +1,4 @@
-package com.dreweaster.ddd.jester.application.repository.deduplicating;
+package com.dreweaster.ddd.jester.application.repository;
 
 public interface CommandDeduplicationStrategyFactory {
 

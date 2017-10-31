@@ -2,8 +2,8 @@ package com.dreweaster.ddd.jester.example.infrastructure;
 
 import com.dreweaster.ddd.jester.domain.DomainModel;
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
-import com.dreweaster.ddd.jester.application.repository.deduplicating.CommandDeduplicationStrategyFactory;
-import com.dreweaster.ddd.jester.application.repository.deduplicating.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
+import com.dreweaster.ddd.jester.application.repository.CommandDeduplicationStrategyFactory;
+import com.dreweaster.ddd.jester.application.repository.TwentyFourHourWindowCommandDeduplicationStrategyFactory;
 import com.dreweaster.ddd.jester.example.application.repository.CommandDeduplicatingEventsourcedUserRepository;
 import com.dreweaster.ddd.jester.example.application.service.UserService;
 import com.dreweaster.ddd.jester.example.application.service.impl.UserServiceImpl;

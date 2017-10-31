@@ -1,4 +1,4 @@
-package com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring;
+package com.dreweaster.ddd.jester.application.repository.monitoring;
 
 import com.dreweaster.ddd.jester.domain.*;
 

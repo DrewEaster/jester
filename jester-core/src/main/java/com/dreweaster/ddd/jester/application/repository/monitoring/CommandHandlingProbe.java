@@ -1,4 +1,4 @@
-package com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring;
+package com.dreweaster.ddd.jester.application.repository.monitoring;
 
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.domain.Aggregate;
@@ -20,11 +20,11 @@ public interface CommandHandlingProbe<A extends Aggregate<C, E, State>, C extend
 
     void startedApplyingCommand();
 
-    void commandAccepted(List<? super E> events);
+    void commandApplicationAccepted(List<? super E> events, boolean deduplicated);
 
-    void commandRejected(Throwable rejection);
+    void commandApplicationRejected(Throwable rejection, boolean deduplicated);
 
-    void commandFailed(Throwable unexpectedException);
+    void commandApplicationFailed(Throwable unexpectedException);
 
     void startedPersistingEvents(List<? super E> events, long expectedSequenceNumber);
 

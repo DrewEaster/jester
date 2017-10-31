@@ -1,8 +1,8 @@
 package com.dreweaster.ddd.jester.example.application.repository;
 
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
-import com.dreweaster.ddd.jester.application.repository.deduplicating.CommandDeduplicatingEventsourcedAggregateRepository;
-import com.dreweaster.ddd.jester.application.repository.deduplicating.CommandDeduplicationStrategyFactory;
+import com.dreweaster.ddd.jester.application.repository.CommandDeduplicatingEventsourcedAggregateRepository;
+import com.dreweaster.ddd.jester.application.repository.CommandDeduplicationStrategyFactory;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.User;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.commands.UserCommand;
 import com.dreweaster.ddd.jester.example.domain.aggregates.user.events.UserEvent;

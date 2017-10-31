@@ -10,6 +10,7 @@
     <version>0-SNAPSHOT</version>
     <modules>
         <module>jester-core</module>
+        <module>jester-dropwizard-metrics</module>
         <module>jester-postgres-eventstore</module>
         <module>jester-json-mapper</module>
         <module>jester-example</module>

@@ -1,9 +1,9 @@
-package com.dreweaster.ddd.jester.application.repository.deduplicating;
+package com.dreweaster.ddd.jester.application.repository;
 
 import com.dreweaster.ddd.jester.application.eventstore.EventStore;
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
-import com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring.AggregateRepositoryReporter;
-import com.dreweaster.ddd.jester.application.repository.deduplicating.monitoring.CommandHandlingProbe;
+import com.dreweaster.ddd.jester.application.repository.monitoring.AggregateRepositoryReporter;
+import com.dreweaster.ddd.jester.application.repository.monitoring.CommandHandlingProbe;
 import com.dreweaster.ddd.jester.domain.*;
 
 import io.vavr.Tuple2;
@@ -111,6 +111,7 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 .onFailure(reportingContext::finishedLoadingEvents)
                 .flatMap(previousEvents -> {
                     reportingContext.finishedLoadingEvents(previousEvents);
+                    reportingContext.startedApplyingCommand();
                     Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder> tuple = previousEvents.foldLeft(
                             new Tuple3<Long, List<E>, CommandDeduplicationStrategyBuilder>(
                                     -1L, List.empty(), commandDeduplicationStrategyFactory.newBuilder()), (acc, e) ->
@@ -143,10 +144,13 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                         // TODO: Capture/log/report on age of duplicate commands
                         // TODO: In theory should query event store specifically for all events matching command id (using snapshots would mean not all events would be read)
                         // TODO: A little inefficient to do a full scan of all events rather than build up a model on first pass (see above)
+                        // TODO: If previous command was a rejection, the response should also be a rejection for consistency
+
                         LOGGER.info("Skipped processing duplicate command: " + wrapper.commandEnvelope().command());
-                        CommandHandlingResult<C,E> deduplicationSuccessResult = SuccessResult.of(
+                        SuccessResult<C,E> deduplicationSuccessResult = SuccessResult.of(
                                 wrapper.commandEnvelope,
                                 previousEvents.filter(e -> e.causationId().get().equals(wrapper.commandEnvelope.commandId().get())).map(PersistedEvent::rawEvent), true);
+                        reportingContext.commandApplicationAccepted(deduplicationSuccessResult.generatedEvents(), true);
                         reportingContext.finishedHandling(deduplicationSuccessResult);
                         return Future.successful(deduplicationSuccessResult);
                     }
@@ -158,18 +162,16 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                 AggregateRootRef<A, C, E, State> aggregateRootRef,
                 Long expectedSequenceNumber,
                 ReportingContext reportingContext) {
-
-            reportingContext.startedApplyingCommand();
             return wrapper.commandEnvelope.correlationId().map( correlationId ->
                 aggregateRootRef.handle(wrapper.commandEnvelope.command())
                     .recoverWith( e -> {
-                        reportingContext.commandFailed(e);
+                        reportingContext.commandApplicationFailed(e);
                         return Future.failed(e);
                     })
                     .flatMap(maybeGeneratedEventsAndState -> {
                         maybeGeneratedEventsAndState.toTry()
-                                .onSuccess(eventsAndState -> reportingContext.commandAccepted(eventsAndState._1))
-                                .onFailure(reportingContext::commandRejected);
+                                .onSuccess(eventsAndState -> reportingContext.commandApplicationAccepted(eventsAndState._1, false))
+                                .onFailure(e -> reportingContext.commandApplicationRejected(e, false));
                         return eitherFutureToFutureEither(maybeGeneratedEventsAndState.map(generatedEventsAndState -> {
                             reportingContext.startedPersistingEvents(generatedEventsAndState._1, generatedEventsAndState._2, expectedSequenceNumber);
                             return eventStore.saveEventsAndState(
@@ -187,13 +189,13 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
                     })
             ).getOrElse(aggregateRootRef.handle(wrapper.commandEnvelope.command())
                     .recoverWith( e -> {
-                        reportingContext.commandFailed(e);
+                        reportingContext.commandApplicationFailed(e);
                         return Future.failed(e);
                     })
                     .flatMap(maybeGeneratedEventsAndState -> {
                         maybeGeneratedEventsAndState.toTry()
-                                .onSuccess(eventsAndState -> reportingContext.commandAccepted(eventsAndState._1))
-                                .onFailure(reportingContext::commandRejected);
+                                .onSuccess(eventsAndState -> reportingContext.commandApplicationAccepted(eventsAndState._1, false))
+                                .onFailure(e -> reportingContext.commandApplicationRejected(e, false));
                         return eitherFutureToFutureEither(maybeGeneratedEventsAndState.map(generatedEventsAndState -> {
                             reportingContext.startedPersistingEvents(generatedEventsAndState._1, generatedEventsAndState._2, expectedSequenceNumber);
                             return eventStore.saveEventsAndState(
@@ -371,18 +373,18 @@ public abstract class CommandDeduplicatingEventsourcedAggregateRepository<A exte
         }
 
         @Override
-        public void commandAccepted(List<? super E> events) {
-            probes.forEach(probe -> probe.commandAccepted(events));
+        public void commandApplicationAccepted(List<? super E> events, boolean deduplicated) {
+            probes.forEach(probe -> probe.commandApplicationAccepted(events, deduplicated));
         }
 
         @Override
-        public void commandRejected(Throwable rejection) {
-            probes.forEach(probe -> probe.commandRejected(rejection));
+        public void commandApplicationRejected(Throwable rejection, boolean deduplicated) {
+            probes.forEach(probe -> probe.commandApplicationRejected(rejection, deduplicated));
         }
 
         @Override
-        public void commandFailed(Throwable unexpectedException) {
-            probes.forEach(probe -> probe.commandFailed(unexpectedException));
+        public void commandApplicationFailed(Throwable unexpectedException) {
+            probes.forEach(probe -> probe.commandApplicationFailed(unexpectedException));
         }
 
         @Override

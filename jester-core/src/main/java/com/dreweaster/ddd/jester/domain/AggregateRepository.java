@@ -99,21 +99,21 @@ public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends
 
     class SuccessResult<C extends DomainCommand, E extends DomainEvent> implements CommandHandlingResult<C,E> {
 
-        public static <C extends DomainCommand, E extends DomainEvent> SuccessResult<C,E> of(CommandEnvelope<C> commandEnvelope, List<? super E> generatedEvents) {
+        public static <C extends DomainCommand, E extends DomainEvent> SuccessResult<C,E> of(CommandEnvelope<C> commandEnvelope, List<E> generatedEvents) {
             return new SuccessResult<>(commandEnvelope, generatedEvents, false);
         }
 
-        public static <C extends DomainCommand, E extends DomainEvent> SuccessResult<C,E> of(CommandEnvelope<C> commandEnvelope, List<? super E> generatedEvents, boolean deduplicated) {
+        public static <C extends DomainCommand, E extends DomainEvent> SuccessResult<C,E> of(CommandEnvelope<C> commandEnvelope, List<E> generatedEvents, boolean deduplicated) {
             return new SuccessResult<>(commandEnvelope, generatedEvents, deduplicated);
         }
 
         private CommandEnvelope<C> commandEnvelope;
 
-        private List<? super E> generatedEvents;
+        private List<E> generatedEvents;
 
         private boolean deduplicated;
 
-        private SuccessResult(CommandEnvelope<C> commandEnvelope, List<? super E> generatedEvents, boolean deduplicated) {
+        private SuccessResult(CommandEnvelope<C> commandEnvelope, List<E> generatedEvents, boolean deduplicated) {
             this.commandEnvelope = commandEnvelope;
             this.generatedEvents = generatedEvents;
             this.deduplicated = deduplicated;
@@ -124,7 +124,7 @@ public interface AggregateRepository<A extends Aggregate<C, E, State>, C extends
             return commandEnvelope;
         }
 
-        public List<? super E> generatedEvents() {
+        public List<E> generatedEvents() {
             return generatedEvents;
         }
 

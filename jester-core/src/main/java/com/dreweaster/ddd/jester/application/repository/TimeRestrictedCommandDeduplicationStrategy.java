@@ -1,4 +1,4 @@
-package com.dreweaster.ddd.jester.application.repository.deduplicating;
+package com.dreweaster.ddd.jester.application.repository;
 
 import com.dreweaster.ddd.jester.application.eventstore.PersistedEvent;
 import com.dreweaster.ddd.jester.domain.CausationId;
@@ -7,7 +7,6 @@ import io.vavr.collection.HashSet;
 import io.vavr.collection.Set;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 
 public class TimeRestrictedCommandDeduplicationStrategy implements CommandDeduplicationStrategy {
 
